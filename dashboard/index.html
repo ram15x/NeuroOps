@@ -15,7 +15,7 @@
             min-height: 100vh;
         }
 
-        /* ── Header ── */
+        /*Header*/
         .header {
             background: linear-gradient(135deg, #0d1b2a, #1a2744);
             padding: 20px 40px;
@@ -48,7 +48,7 @@
             50% { opacity: 0.6; }
         }
 
-        /* ── Grid ── */
+        /*Grid*/
         .container { padding: 30px 40px; }
 
         .grid-4 {
@@ -65,7 +65,7 @@
             margin-bottom: 30px;
         }
 
-        /* ── Cards ── */
+        /*Cards*/
         .card {
             background: #0d1b2a;
             border: 1px solid #1e3a5f;
@@ -97,7 +97,7 @@
         .card.warning  { border-color: #ffaa00; }
         .card.success  { border-color: #00ff88; }
 
-        /* ── Module Panels ── */
+        /*Module Panels*/
         .panel {
             background: #0d1b2a;
             border: 1px solid #1e3a5f;
@@ -116,7 +116,7 @@
             gap: 10px;
         }
 
-        /* ── Inputs ── */
+        /*Inputs*/
         .input-row {
             display: flex;
             gap: 12px;
@@ -165,7 +165,7 @@
             color: #000;
         }
 
-        /* ── Response Box ── */
+        /*Response Box*/
         .response-box {
             background: #060d1a;
             border: 1px solid #1e3a5f;
@@ -181,7 +181,7 @@
 
         .response-box.error { color: #ff4444; }
 
-        /* ── Alert Feed ── */
+        /*Alert Feed*/
         .alert-item {
             display: flex;
             align-items: center;
@@ -207,7 +207,7 @@
         .alert-dot.critical { background: #ff4444; }
         .alert-dot.warning  { background: #ffaa00; }
 
-        /* ── Tags ── */
+        /*Tags*/
         .tag {
             display: inline-block;
             padding: 3px 10px;
@@ -220,13 +220,13 @@
         .tag.warning  { background: #2d1a00; color: #ffaa00; }
         .tag.normal   { background: #0a2d1a; color: #00ff88; }
 
-        /* ── Chart ── */
+        /*Chart*/
         .chart-container {
             position: relative;
             height: 220px;
         }
 
-        /* ── Loading ── */
+        /*Loading*/
         .loading {
             color: #4a6a8a;
             font-style: italic;
@@ -238,7 +238,7 @@
 
 <!-- Header -->
 <div class="header">
-    <div class="logo">⚡ NeuroOps</div>
+    <div class="logo"> NeuroOps - By R4m</div>
     <div style="display:flex; gap:16px; align-items:center;">
         <span style="color:#4a6a8a; font-size:13px;" id="last-updated">Loading...</span>
         <div class="status-badge">● LIVE</div>
@@ -274,7 +274,7 @@
     <!-- InfraMind + Chart -->
     <div class="grid-2">
         <div class="panel">
-            <div class="panel-title">📡 InfraMind — Anomaly Detection</div>
+            <div class="panel-title">InfraMind — Anomaly Detection</div>
             <div class="input-row">
                 <input type="number" id="inf-value" placeholder="Metric value" value="99.9">
                 <input type="number" id="inf-mean" placeholder="Rolling mean" value="20.0">
@@ -286,7 +286,7 @@
         </div>
 
         <div class="panel">
-            <div class="panel-title">📊 Anomaly Score History</div>
+            <div class="panel-title">Anomaly Score History</div>
             <div class="chart-container">
                 <canvas id="anomalyChart"></canvas>
             </div>
@@ -295,7 +295,7 @@
 
     <!-- OpsGPT -->
     <div class="panel">
-        <div class="panel-title">🧠 OpsGPT — AI Log Analysis</div>
+        <div class="panel-title">OpsGPT — AI Log Analysis</div>
         <textarea id="ops-log" placeholder="Paste your log error here...">ERROR: Database connection timeout after 30s. Max retries exceeded. Service unavailable.</textarea>
         <br>
         <button onclick="runOpsGPT()">Analyze Log</button>
@@ -305,7 +305,7 @@
     <!-- Failure + ScaleWise -->
     <div class="grid-2">
         <div class="panel">
-            <div class="panel-title">⚠️ Failure Prediction</div>
+            <div class="panel-title">Failure Prediction</div>
             <div class="input-row">
                 <input type="text"   id="fail-unit"  placeholder="Unit ID" value="engine_01">
                 <input type="number" id="fail-s1"    placeholder="sensor1" value="518.67">
@@ -317,7 +317,7 @@
         </div>
 
         <div class="panel">
-            <div class="panel-title">💰 ScaleWise — Cost Optimizer</div>
+            <div class="panel-title">ScaleWise — Cost Optimizer</div>
             <div class="input-row">
                 <select id="sw-instance">
                     <option value="m5.xlarge">m5.xlarge</option>
@@ -336,7 +336,7 @@
 
     <!-- Auto-Healing -->
     <div class="panel">
-        <div class="panel-title">🔧 Auto-Healing Pipeline</div>
+        <div class="panel-title">Auto-Healing Pipeline</div>
         <div class="input-row">
             <input type="text" id="ah-service" placeholder="Service name" value="payment-service">
             <input type="number" id="ah-metric" placeholder="Metric value" value="99.9">
@@ -373,7 +373,7 @@
 </div>
 
 <script>
-const API = "http://127.0.0.1:8000/api";
+const API = "http://127.0.0.1:8000/api/v1";
 const WS  = "ws://127.0.0.1:8000/ws/stream";
 
 // ── Chart Setup ────────────────────────────────────────
@@ -407,7 +407,7 @@ const anomalyChart = new Chart(ctx, {
 let alertCount = 0;
 let ws = null;
 
-// ── WebSocket Live Stream ──────────────────────────────
+// WebSocket Live Stream
 function connectWebSocket() {
     ws = new WebSocket(WS);
 
@@ -492,7 +492,7 @@ function updateServiceGrid(services) {
     `).join("");
 }
 
-// ── InfraMind ──────────────────────────────────────────
+// Inframind
 async function runInfraMind() {
     const box = document.getElementById("inf-result");
     box.className = "response-box loading";
@@ -520,7 +520,7 @@ async function runInfraMind() {
     }
 }
 
-// ── OpsGPT ────────────────────────────────────────────
+//OpsGPT
 async function runOpsGPT() {
     const box = document.getElementById("ops-result");
     box.className = "response-box loading";
@@ -540,7 +540,7 @@ async function runOpsGPT() {
     }
 }
 
-// ── Failure Prediction ────────────────────────────────
+//Failure Prediction
 async function runFailure() {
     const box = document.getElementById("fail-result");
     box.className = "response-box loading";
@@ -567,7 +567,7 @@ async function runFailure() {
     }
 }
 
-// ── ScaleWise ─────────────────────────────────────────
+//ScaleWise
 async function runScaleWise() {
     const box = document.getElementById("sw-result");
     box.className = "response-box loading";
@@ -592,7 +592,7 @@ async function runScaleWise() {
     }
 }
 
-// ── Auto-Healing ──────────────────────────────────────
+//Auto-Healing 
 async function runAutoHealing() {
     const box = document.getElementById("ah-result");
     box.className = "response-box loading";
@@ -617,7 +617,7 @@ async function runAutoHealing() {
     }
 }
 
-// ── Alert Feed ────────────────────────────────────────
+//Alert Feed
 function addAlert(data) {
     const feed = document.getElementById("alert-feed");
     const severity = data.severity || "normal";
@@ -667,7 +667,7 @@ function updateHealth(severity) {
     }
 }
 
-// ── Init ──────────────────────────────────────────────
+//Init 
 document.getElementById("stat-anomalies").textContent = "0";
 document.getElementById("stat-health").textContent    = "HEALTHY";
 loadAlerts();

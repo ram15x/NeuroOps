@@ -3,14 +3,17 @@ from sqlalchemy.orm import Session
 from backend.models.database import get_db, Alert
 from backend.services.redis_service import redis_client
 import json
+from backend.models.schemas import HealingInput, PipelineInput
+from backend.api.auth import get_current_user
+from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 
 router = APIRouter()
 
-# ── Healing Action Rules ───────────────────────────────
+#healing rules
 HEALING_RULES = {
     "critical": {
-        "action"     : "RESTART_AND_SCALE",
+        "action"     : "RESTART AND SCALE",
         "description": "Restart service and scale replicas",
         "steps": [
             "1. Restart crashed container",
@@ -39,24 +42,24 @@ HEALING_RULES = {
     }
 }
 
-# ── Trigger Healing ────────────────────────────────────
+#trigger healinh6
 @router.post("/autohealing/trigger")
-def trigger_healing(data: dict, db: Session = Depends(get_db)):
+def trigger_healing(data: HealingInput, db: Session = Depends(get_db)):
     try:
-        severity     = data.get("severity", "normal").lower()
-        service_name = data.get("service", "unknown-service")
-        metric_value = data.get("metric_value", 0)
-        reason       = data.get("reason", "Anomaly detected")
+        severity     = data.severity
+        service_name = data.service
+        metric_value = data.metric_value
+        reason       = data.reason
 
-        # ── Get Healing Plan ───────────────────────────
+
+        #get healing plans
         rule = HEALING_RULES.get(severity, HEALING_RULES["normal"])
 
-        # ── Simulate Healing Execution ─────────────────
         healing_result = execute_healing(
             service_name, rule, severity, metric_value
         )
 
-        # ── Cache Healing Status ───────────────────────
+        #cache healing status
         cache_key = f"healing:{service_name}"
         redis_client.setex(
             cache_key, 300,
@@ -69,9 +72,10 @@ def trigger_healing(data: dict, db: Session = Depends(get_db)):
         return {"error": str(e)}
 
 
-# ── Full Pipeline: Detect + Heal ───────────────────────
+#detect and heal pipeline
 @router.post("/autohealing/pipeline")
-def full_pipeline(data: dict, db: Session = Depends(get_db)):
+def full_pipeline(data: dict, db: Session = Depends(get_db),current_user: dict = Depends(get_current_user)):
+    
     """
     Full NeuroOps pipeline:
     1. Receive metric
@@ -81,20 +85,23 @@ def full_pipeline(data: dict, db: Session = Depends(get_db)):
     5. Return full report
     """
     try:
-        service_name = data.get("service", "unknown")
-        metric_value = data.get("metric_value", 0)
-        severity     = data.get("severity", "normal")
-        log_message  = data.get("log", "")
+        current_user: dict = Depends(get_current_user)
+        service_name = data.service
+        metric_value = data.metric_value
+        severity     = data.severity
+        log_message  = data.log
 
-        # ── Step 1: Determine Action ───────────────────
+
+
+        #determine action
         rule = HEALING_RULES.get(severity, HEALING_RULES["normal"])
 
-        # ── Step 2: Execute Healing ────────────────────
+        #exe heal
         healing = execute_healing(
             service_name, rule, severity, metric_value
         )
 
-        # ── Step 3: Build Full Report ──────────────────
+        #build report
         report = {
             "pipeline"     : "NeuroOps Auto-Healing Pipeline",
             "timestamp"    : datetime.utcnow().isoformat(),
@@ -108,7 +115,7 @@ def full_pipeline(data: dict, db: Session = Depends(get_db)):
             "status"       : "RESOLVED" if severity != "critical" else "IN_PROGRESS"
         }
 
-        # ── Save to DB ─────────────────────────────────
+        #save it to db
         alert = Alert(
             metric_value  = metric_value,
             rolling_mean  = 0,
@@ -128,7 +135,7 @@ def full_pipeline(data: dict, db: Session = Depends(get_db)):
         return {"error": str(e)}
 
 
-# ── Get Healing Status ─────────────────────────────────
+#get healing status
 @router.get("/autohealing/status/{service_name}")
 def get_healing_status(service_name: str):
     cache_key = f"healing:{service_name}"
@@ -141,13 +148,13 @@ def get_healing_status(service_name: str):
     }
 
 
-# ── Healing Rules Overview ─────────────────────────────
+#heal rules overview
 @router.get("/autohealing/rules")
 def get_rules():
     return {"rules": HEALING_RULES}
 
 
-# ── Execute Healing (Simulated) ────────────────────────
+#execute simulated healing 
 def execute_healing(
     service_name: str,
     rule: dict,

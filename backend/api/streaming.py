@@ -10,12 +10,10 @@ import random
 from datetime import datetime
 
 router = APIRouter()
-
-# ── Load InfraMind Model ───────────────────────────────
 model  = joblib.load("ml_models/saved/inframind_model.pkl")
 scaler = joblib.load("ml_models/saved/inframind_scaler.pkl")
 
-# ── Simulated Services ─────────────────────────────────
+#simulated services 
 SERVICES = [
     "payment-service",
     "auth-service",
@@ -76,12 +74,11 @@ def run_prediction(metric: dict) -> dict:
         "type"          : "metric_stream"
     }
 
-# ── Main WebSocket Endpoint ────────────────────────────
+#WebSocket endpt
 @router.websocket("/ws/stream")
 async def metric_stream(websocket: WebSocket):
     await manager.connect(websocket)
 
-    # Send welcome message
     await manager.send_personal({
         "type"   : "connected",
         "message": "NeuroOps stream connected",
@@ -90,21 +87,21 @@ async def metric_stream(websocket: WebSocket):
 
     try:
         while True:
-            # ── Generate + Predict for all services ───
+            #generate & predict for all services
             stream_data = []
             for service in SERVICES:
                 metric     = generate_metric(service)
                 prediction = run_prediction(metric)
                 stream_data.append(prediction)
 
-                # Cache in Redis
+                # cache in redis
                 redis_client.setex(
                     f"live:{service}",
                     10,
                     json.dumps(prediction)
                 )
 
-            # ── Broadcast to all connected clients ────
+            #broadcast to all connected clients
             payload = {
                 "type"     : "metric_stream",
                 "timestamp": datetime.utcnow().isoformat(),
@@ -123,7 +120,7 @@ async def metric_stream(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-# ── Get Live Status from Redis ─────────────────────────
+#get live status from redis 
 @router.get("/stream/status")
 def get_live_status():
     status = {}

@@ -5,7 +5,7 @@ import os
 
 load_dotenv("backend/.env")
 
-# ── Connect to Redis ───────────────────────────────────
+#Connect to Redis
 redis_client = redis.Redis(
     host="localhost",
     port=6379,

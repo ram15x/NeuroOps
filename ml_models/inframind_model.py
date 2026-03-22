@@ -5,20 +5,18 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 import os
 
-# ── Paths ──────────────────────────────────────────────
+#Paths 
 INPUT_FILE  = "datasets/processed/metrics_clean.csv"
 MODEL_DIR   = "ml_models/saved"
 MODEL_PATH  = f"{MODEL_DIR}/inframind_model.pkl"
 SCALER_PATH = f"{MODEL_DIR}/inframind_scaler.pkl"
 
 os.makedirs(MODEL_DIR, exist_ok=True)
-
-# ── Load Data ──────────────────────────────────────────
-print("Loading metrics dataset...")
+print("Loading metrics dataset")
 df = pd.read_csv(INPUT_FILE, parse_dates=["timestamp"])
 
-# ── Feature Engineering ────────────────────────────────
-print("Engineering features...")
+#Feature engg
+print("Engineering features")
 df = df.sort_values(["metric", "timestamp"])
 
 df["rolling_mean"] = (
@@ -36,25 +34,25 @@ df["value_diff"] = (
     .transform(lambda x: x.diff().fillna(0))
 )
 
-# ── Prepare Features ───────────────────────────────────
+#Prepare Features
 FEATURES = ["value", "rolling_mean", "rolling_std", "value_diff"]
 X = df[FEATURES].fillna(0)
 
-# ── Scale ──────────────────────────────────────────────
-print("Scaling features...")
+# Scale 
+print("Scaling features")
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# ── Train Isolation Forest ─────────────────────────────
+#Isolation Forest
 print("Training Isolation Forest model...")
 model = IsolationForest(
     n_estimators=100,
-    contamination=0.08,   # expect ~5% anomalies
+    contamination=0.08,   # expect ~8% anomalies can be changed based on needs
     random_state=42
 )
 model.fit(X_scaled)
 
-# ── Predict & Label ────────────────────────────────────
+#Predict & Label
 df["anomaly_score"] = model.decision_function(X_scaled)
 df["predicted_anomaly"] = model.predict(X_scaled)
 df["predicted_anomaly"] = df["predicted_anomaly"].map({1: 0, -1: 1})
