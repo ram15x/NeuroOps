@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
-# InfraMind input schema
+#infraMind input
 class MetricInput(BaseModel):
     metric: Optional[str] = "unknown"
     value: float = Field(..., ge=0, le=1000, description="Metric value")
@@ -10,11 +10,11 @@ class MetricInput(BaseModel):
     value_diff: float = Field(..., ge=-1000, le=1000)
     force: Optional[bool] = False
 
-# OpsGPT input schema
+#OpsGPT input
 class LogInput(BaseModel):
     log: str = Field(..., min_length=5, max_length=5000)
 
-# Failure prediction input schema
+# failure prediction input
 class FailureInput(BaseModel):
     unit_id: Optional[str] = "unknown"
     sensor1: float = 0.0
@@ -42,33 +42,33 @@ class FailureInput(BaseModel):
     sensor23: float = 0.0
     sensor24: float = 0.0
 
-# ScaleWise input schema
+#scaleWise input
 class CostInput(BaseModel):
     instance_type: str = Field(..., min_length=1)
     cpu_usage: float = Field(..., ge=0, le=100)
     ram_usage: float = Field(..., ge=0, le=100)
     hours_running: Optional[float] = 730.0
 
-# Auto-healing input schema
+#auto-heal input
 class HealingInput(BaseModel):
     service: str = Field(..., min_length=1)
     severity: str = Field(..., pattern="^(critical|warning|normal)$")
     metric_value: Optional[float] = 0.0
     reason: Optional[str] = "Anomaly detected"
 
-# Pipeline input schema
+#pipeline input
 class PipelineInput(BaseModel):
     service: str = Field(..., min_length=1)
     metric_value: Optional[float] = 0.0
     severity: str = Field(..., pattern="^(critical|warning|normal)$")
     log: Optional[str] = ""
 
-# BuildSense input schema
+#buildsense input
 class BuildInput(BaseModel):
     service: str = Field(..., min_length=1)
     branch: Optional[str] = "main"
 
-# DeployGuard input schema
+#deployguard input
 class DeployInput(BaseModel):
     service: str = Field(..., min_length=1)
     version: Optional[str] = "v1.0.0"
@@ -78,7 +78,7 @@ class DeployInput(BaseModel):
     recent_failures: int = Field(..., ge=0)
     deployment_size_mb: float = Field(..., ge=0)
 
-# Safe window input schema
+# Safe-window input
 class SafeWindowInput(BaseModel):
     cpu_usage: float = Field(..., ge=0, le=100)
     memory_usage: float = Field(..., ge=0, le=100)
@@ -86,7 +86,7 @@ class SafeWindowInput(BaseModel):
     recent_failures: int = Field(..., ge=0)
     deployment_size_mb: float = Field(..., ge=0)
 
-# Fleet input schema
+# fleet input
 class FleetInput(BaseModel):
     instances: list
     

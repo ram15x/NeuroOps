@@ -1,15 +1,14 @@
 import joblib
 import numpy as np
 
-# model a — random forest (already exists)
+# model a random forest
 MODEL_A_PATH  = "ml_models/saved/failure_rul_model.pkl"
 SCALER_A_PATH = "ml_models/saved/failure_rul_scaler.pkl"
 
-# model b — gradient boosting (new)
+# model b gradient boosting
 MODEL_B_PATH  = "ml_models/saved/failure_rul_model_b.pkl"
 SCALER_B_PATH = "ml_models/saved/failure_rul_scaler_b.pkl"
 
-# load both models once at import time
 model_a  = joblib.load(MODEL_A_PATH)
 scaler_a = joblib.load(SCALER_A_PATH)
 
@@ -21,12 +20,12 @@ HOURS_PER_CYCLE = 1.0
 def run_ab_test(sensor_values: list) -> dict:
     X = np.array(sensor_values).reshape(1, -1)
 
-    # run model a - random forest
+    # run model a
     X_a      = scaler_a.transform(X)
     rul_a_raw = float(model_a.predict(X_a)[0])
     rul_a     = max(0.0, round(rul_a_raw, 1))
 
-    # run model b - gradient boosting
+    # run model b
     X_b       = scaler_b.transform(X)
     rul_b_raw = float(model_b.predict(X_b)[0])
     rul_b     = max(0.0, round(rul_b_raw, 1))

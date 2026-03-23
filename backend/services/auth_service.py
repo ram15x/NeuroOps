@@ -4,15 +4,15 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
 
-# ── Config ─────────────────────────────────────────────
-SECRET_KEY    = "neuroops-super-secret-key-2026-change-in-production"
+#config
+SECRET_KEY    = "neuroops-super-secret-key"
 ALGORITHM     = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# ── Password Hashing ───────────────────────────────────
+#pass word hash
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# ── Fake User DB (replace with PostgreSQL later) ───────
+#Fake User DB -replace with PostgreSQL later
 USERS_DB = {
     "admin": {
         "username": "admin",

@@ -13,7 +13,7 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# ── Alert Table ────────────────────────────────────────
+#alert table
 class Alert(Base):
     __tablename__ = "alerts"
 
@@ -28,12 +28,12 @@ class Alert(Base):
     message       = Column(String)
     created_at    = Column(DateTime, default=datetime.utcnow)
 
-# ── Create Tables ──────────────────────────────────────
+#create table
 def init_db():
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created!")
+    print("Database tables created")
 
-# ── DB Session ─────────────────────────────────────────
+#db session
 def get_db():
     db = SessionLocal()
     try:

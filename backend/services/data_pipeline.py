@@ -8,7 +8,7 @@ METRICS_PATH = "datasets/processed/metrics_clean.csv"
 FAILURE_PATH = "datasets/processed/failure_clean.csv"
 LOGS_PATH    = "datasets/processed/logs_clean.csv"
 
-# how many rows to sample for pipeline run — keeps it fast during demo
+#sample for pipeline run
 SAMPLE_SIZE = 500
 
 
@@ -18,7 +18,7 @@ def run_metrics_pipeline() -> dict:
     # sample recent rows
     df = df.tail(SAMPLE_SIZE)
 
-    # compute features per metric type
+    #features per metric
     results = []
     for metric in df["metric"].unique():
         subset = df[df["metric"] == metric]["value"]
@@ -85,7 +85,7 @@ def run_drift_check() -> dict:
     df      = pd.read_csv(METRICS_PATH).tail(100)
     values  = df["value"].tolist()
 
-    # record predictions in drift detector
+    # record prediction in drift detector
     for val in values[:20]:
         # treat high values as anomaly signal for drift tracking
         is_anomaly = val > df["value"].quantile(0.95)
@@ -106,7 +106,7 @@ def run_full_pipeline() -> dict:
     stages     = []
     errors     = []
 
-    # stage 1 — metrics features
+    # stage 1 -metrics features
     try:
         result = run_metrics_pipeline()
         stages.append(result)

@@ -2,11 +2,11 @@ import shap
 import numpy as np
 import pandas as pd
 
-# global explainer instance - loaded once at startup
+# global explainer loaded once at startup
 explainer = None
 
 def load_explainer(model, scaler, background_data: pd.DataFrame):
-    # creates SHAP explainer using the trained isolation forest model
+    # creates SHAP explainer using iso forest
     # background_data is a sample from training data used as reference
     global explainer
     X_scaled   = scaler.transform(background_data)
