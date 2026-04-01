@@ -18,7 +18,6 @@ RISK_WEIGHTS = {
     "deployment_size": 0.10,
 }
 
-
 def calculate_risk_score(data: dict) -> float:
     cpu         = data.get("cpu_usage", 0) / 100
     memory      = data.get("memory_usage", 0) / 100

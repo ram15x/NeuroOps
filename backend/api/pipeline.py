@@ -5,8 +5,6 @@ from backend.services.task_manager import create_job, update_job
 import json
 
 router = APIRouter()
-
-
 def run_pipeline_task(job_id: str):
     try:
         result = run_full_pipeline()

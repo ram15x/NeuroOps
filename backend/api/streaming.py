@@ -1,133 +1,172 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.services.ws_manager import manager
 from backend.services.redis_service import redis_client
-import joblib
-import pandas as pd
-import numpy as np
-import asyncio
+from backend.services.aws_service import list_ec2_instances
+from backend.core.logger import get_logger
 import json
+import asyncio
 import random
 from datetime import datetime
 
+logger = get_logger(__name__)
+
 router = APIRouter()
-model  = joblib.load("ml_models/saved/inframind_model.pkl")
-scaler = joblib.load("ml_models/saved/inframind_scaler.pkl")
 
-#simulated services 
-SERVICES = [
-    "payment-service",
-    "auth-service",
-    "api-gateway",
-    "database-proxy",
-    "notification-service"
-]
 
-def generate_metric(service: str) -> dict:
-    """Generate realistic metric with occasional spikes"""
-    is_spike = random.random() < 0.1  # 10% chance of spike
-
-    if is_spike:
-        value        = random.uniform(85, 99)
-        rolling_mean = random.uniform(40, 60)
-        rolling_std  = random.uniform(20, 40)
-        value_diff   = random.uniform(30, 60)
-    else:
-        value        = random.uniform(10, 65)
-        rolling_mean = random.uniform(20, 50)
-        rolling_std  = random.uniform(2, 10)
-        value_diff   = random.uniform(-5, 10)
-
-    return {
-        "service"     : service,
-        "value"       : round(value, 2),
-        "rolling_mean": round(rolling_mean, 2),
-        "rolling_std" : round(rolling_std, 2),
-        "value_diff"  : round(value_diff, 2),
-        "timestamp"   : datetime.utcnow().isoformat()
-    }
-
-def run_prediction(metric: dict) -> dict:
-    """Run InfraMind prediction on metric"""
-    features = pd.DataFrame([{
-        "value"        : metric["value"],
-        "rolling_mean" : metric["rolling_mean"],
-        "rolling_std"  : metric["rolling_std"],
-        "value_diff"   : metric["value_diff"],
-    }])
-
-    X_scaled   = scaler.transform(features)
-    prediction = model.predict(X_scaled)[0]
-    score      = float(model.decision_function(X_scaled)[0])
-    is_anomaly = bool(prediction == -1)
-
-    if metric["value"] > 90 and metric["value_diff"] > 50:
-        is_anomaly = True
-        score = -0.20
-
-    severity = "critical" if score < -0.15 else "warning" if score < -0.05 else "normal"
-
-    return {
-        **metric,
-        "is_anomaly"    : is_anomaly,
-        "anomaly_score" : round(score, 4),
-        "severity"      : severity,
-        "type"          : "metric_stream"
-    }
-
-#WebSocket endpt
 @router.websocket("/ws/stream")
 async def metric_stream(websocket: WebSocket):
     await manager.connect(websocket)
-
-    await manager.send_personal({
-        "type"   : "connected",
-        "message": "NeuroOps stream connected",
-        "time"   : datetime.utcnow().isoformat()
-    }, websocket)
-
+    
     try:
+        # Send initial connection confirmation
+        await websocket.send_text(json.dumps({
+            "type": "connected",
+            "message": "NeuroOps stream connected",
+            "time": datetime.utcnow().isoformat()
+        }))
+        
         while True:
-            #generate & predict for all services
-            stream_data = []
-            for service in SERVICES:
-                metric     = generate_metric(service)
-                prediction = run_prediction(metric)
-                stream_data.append(prediction)
-
-                # cache in redis
-                redis_client.setex(
-                    f"live:{service}",
-                    10,
-                    json.dumps(prediction)
-                )
-
-            #broadcast to all connected clients
-            payload = {
-                "type"     : "metric_stream",
-                "timestamp": datetime.utcnow().isoformat(),
-                "services" : stream_data,
-                "summary"  : {
-                    "total"    : len(stream_data),
-                    "anomalies": sum(1 for s in stream_data if s["is_anomaly"]),
-                    "critical" : sum(1 for s in stream_data if s["severity"] == "critical"),
-                    "healthy"  : sum(1 for s in stream_data if s["severity"] == "normal")
+            try:
+                # Check if connection is still open
+                if websocket.client_state.value != 1:  # 1 = CONNECTED
+                    logger.info("WebSocket client disconnected, breaking loop")
+                    break
+                
+                # Get real EC2 instances
+                instances = list_ec2_instances()
+                running_instances = [i for i in instances if i.get("state") == "running"]
+                
+                services_data = []
+                anomalies_count = 0
+                critical_count = 0
+                
+                for instance in running_instances[:5]:
+                    instance_id = instance["instance_id"]
+                    
+                    # Get real CPU from Redis
+                    cpu_key = f"real_cpu:{instance_id}"
+                    cpu_value = redis_client.get(cpu_key)
+                    
+                    if cpu_value:
+                        cpu_value = float(cpu_value)
+                    else:
+                        from backend.services.aws_service import fetch_cloudwatch_metrics
+                        metrics = fetch_cloudwatch_metrics(instance_id, minutes=5)
+                        cpu_data = metrics.get("CPUUtilization", [])
+                        if cpu_data:
+                            cpu_value = cpu_data[-1]["value"]
+                        else:
+                            cpu_value = random.uniform(5, 15)
+                    
+                    # Get anomaly score
+                    anomaly_key = f"alert:{instance_id}"
+                    alert_data = redis_client.get(anomaly_key)
+                    
+                    is_anomaly = False
+                    anomaly_score = 0.15
+                    severity = "normal"
+                    
+                    if alert_data:
+                        alert = json.loads(alert_data)
+                        is_anomaly = alert.get("is_anomaly", False)
+                        anomaly_score = alert.get("anomaly_score", 0.15)
+                        severity = alert.get("severity", "normal")
+                    
+                    # Get memory and disk
+                    memory_key = f"memory:{instance_id}"
+                    disk_key = f"disk:{instance_id}"
+                    memory_value = redis_client.get(memory_key)
+                    disk_value = redis_client.get(disk_key)
+                    
+                    # Get failure prediction
+                    failure_key = f"failure_prediction:{instance_id}"
+                    failure_data = redis_client.get(failure_key)
+                    failure_prob = 0
+                    failure_risk = "NORMAL"
+                    if failure_data:
+                        failure = json.loads(failure_data)
+                        failure_prob = failure.get("failure_probability", 0)
+                        failure_risk = failure.get("risk_level", "NORMAL")
+                    
+                    # Get RUL prediction
+                    rul_key = f"rul_prediction:{instance_id}"
+                    rul_data = redis_client.get(rul_key)
+                    rul_cycles = 0
+                    rul_urgency = "LOW"
+                    if rul_data:
+                        rul = json.loads(rul_data)
+                        rul_cycles = rul.get("cycles_remaining", 0)
+                        rul_urgency = rul.get("urgency", "LOW")
+                    
+                    services_data.append({
+                        "service": f"EC2-{instance_id[-8:]}",
+                        "instance_id": instance_id,
+                        "cpu": round(cpu_value, 2),
+                        "memory": float(memory_value) if memory_value else 0,
+                        "disk": float(disk_value) if disk_value else 0,
+                        "failure_probability": round(failure_prob, 1),
+                        "failure_risk": failure_risk,
+                        "rul_cycles": rul_cycles,
+                        "rul_urgency": rul_urgency,
+                        "rolling_mean": round(cpu_value * 0.85, 2),
+                        "rolling_std": round(cpu_value * 0.15, 2),
+                        "value_diff": round(cpu_value * 0.05, 2),
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "is_anomaly": is_anomaly,
+                        "anomaly_score": round(anomaly_score, 4),
+                        "severity": severity,
+                        "type": "metric_stream"
+                    })
+                    
+                    if is_anomaly:
+                        anomalies_count += 1
+                        if severity == "critical":
+                            critical_count += 1
+                
+                if not services_data:
+                    services_data = [{
+                        "service": "no-instances",
+                        "cpu": 0,
+                        "is_anomaly": False,
+                        "anomaly_score": 0.1,
+                        "severity": "normal",
+                        "type": "metric_stream"
+                    }]
+                
+                health_score = 100
+                if anomalies_count > 0:
+                    health_score = max(0, 100 - (anomalies_count * 20))
+                
+                message = {
+                    "type": "metric_stream",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "services": services_data,
+                    "summary": {
+                        "total": len(services_data),
+                        "anomalies": anomalies_count,
+                        "critical": critical_count,
+                        "healthy": len(services_data) - anomalies_count,
+                        "health_score": health_score
+                    }
                 }
-            }
-
-            await manager.send_personal(payload, websocket)
-            await asyncio.sleep(3)  # stream every 3 seconds
-
+                
+                # Only send if connection is still open
+                if websocket.client_state.value == 1:
+                    await manager.send_personal(message, websocket)
+                
+                await asyncio.sleep(5)
+                
+            except WebSocketDisconnect:
+                logger.info("WebSocket disconnected in inner loop")
+                break
+            except Exception as e:
+                logger.error(f"WebSocket stream error: {e}")
+                await asyncio.sleep(5)
+                
     except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket outer error: {e}")
+    finally:
         manager.disconnect(websocket)
-
-#get live status from redis 
-@router.get("/stream/status")
-def get_live_status():
-    status = {}
-    for service in SERVICES:
-        cached = redis_client.get(f"live:{service}")
-        if cached:
-            status[service] = json.loads(cached)
-        else:
-            status[service] = {"status": "no data yet"}
-    return status
+        logger.info("WebSocket cleaned up")

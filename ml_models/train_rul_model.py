@@ -10,7 +10,7 @@ TRAIN_PATH = "datasets/processed/failure_clean.csv"
 MODEL_OUT   = "ml_models/saved/failure_rul_model.pkl"
 SCALER_OUT  = "ml_models/saved/failure_rul_scaler.pkl"
  
-print("loading data...")
+print("loading data")
 df = pd.read_csv(TRAIN_PATH)
  
 # calculate max cycle per unit so we can compute RUL

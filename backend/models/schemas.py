@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
-#infraMind input
+# infraMind input
 class MetricInput(BaseModel):
     metric: Optional[str] = "unknown"
     value: float = Field(..., ge=0, le=1000, description="Metric value")
@@ -10,7 +10,7 @@ class MetricInput(BaseModel):
     value_diff: float = Field(..., ge=-1000, le=1000)
     force: Optional[bool] = False
 
-#OpsGPT input
+# OpsGPT input
 class LogInput(BaseModel):
     log: str = Field(..., min_length=5, max_length=5000)
 
@@ -42,33 +42,35 @@ class FailureInput(BaseModel):
     sensor23: float = 0.0
     sensor24: float = 0.0
 
-#scaleWise input
+# scaleWise input
 class CostInput(BaseModel):
     instance_type: str = Field(..., min_length=1)
     cpu_usage: float = Field(..., ge=0, le=100)
     ram_usage: float = Field(..., ge=0, le=100)
     hours_running: Optional[float] = 730.0
 
-#auto-heal input
+# auto-heal input with metric type
 class HealingInput(BaseModel):
     service: str = Field(..., min_length=1)
     severity: str = Field(..., pattern="^(critical|warning|normal)$")
     metric_value: Optional[float] = 0.0
+    metric_type: Optional[str] = Field("cpu", pattern="^(cpu|memory|disk|network)$")
     reason: Optional[str] = "Anomaly detected"
 
-#pipeline input
+# pipeline input
 class PipelineInput(BaseModel):
     service: str = Field(..., min_length=1)
     metric_value: Optional[float] = 0.0
+    metric_type: Optional[str] = "cpu"
     severity: str = Field(..., pattern="^(critical|warning|normal)$")
     log: Optional[str] = ""
 
-#buildsense input
+# buildsense input
 class BuildInput(BaseModel):
     service: str = Field(..., min_length=1)
     branch: Optional[str] = "main"
 
-#deployguard input
+# deployguard input
 class DeployInput(BaseModel):
     service: str = Field(..., min_length=1)
     version: Optional[str] = "v1.0.0"

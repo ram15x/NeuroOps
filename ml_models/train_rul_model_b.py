@@ -13,7 +13,6 @@ SCALER_OUT = "ml_models/saved/failure_rul_scaler_b.pkl"
 print("loading data...")
 df = pd.read_csv(TRAIN_PATH)
 
-# same RUL calculation as model a
 max_cycle = df.groupby("unit")["cycle"].max().reset_index()
 max_cycle.columns = ["unit", "max_cycle"]
 df = df.merge(max_cycle, on="unit")
@@ -31,7 +30,6 @@ scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
 print(f"training gradient boosting on {len(X)} samples...")
-# gradient boosting is slower to train but often more precise on tabular data
 model = GradientBoostingRegressor(
     n_estimators=200,
     max_depth=5,

@@ -1,30 +1,30 @@
-import redis
 import json
-from dotenv import load_dotenv
-import os
+import redis
+from backend.core.config import settings
 
-load_dotenv("backend/.env")
-
-#Connect to Redis
 redis_client = redis.Redis(
-    host="localhost",
-    port=6379,
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    db=settings.REDIS_DB,
     decode_responses=True
 )
 
-def cache_alert(metric_name: str, alert_data: dict, expiry_seconds: int = 300):
+def get_redis():
+    return redis_client
+
+def cache_alert(metric_name: str, alert_data: dict, expiry_seconds: int = None):
     """
     Cache latest alert for a metric.
-    Expires after 5 minutes by default.
     """
+    if expiry_seconds is None:
+        expiry_seconds = settings.ALERT_CACHE_TTL
+    
     key = f"alert:{metric_name}"
     redis_client.setex(key, expiry_seconds, json.dumps(alert_data))
-    print(f"Cached alert for {metric_name}")
 
 def get_cached_alert(metric_name: str):
     """
     Get cached alert for a metric.
-    Returns None if not cached.
     """
     key = f"alert:{metric_name}"
     data = redis_client.get(key)
@@ -36,7 +36,7 @@ def cache_system_status(status: dict):
     """
     Cache overall system health status.
     """
-    redis_client.setex("system:status", 60, json.dumps(status))
+    redis_client.setex("system:status", settings.SYSTEM_STATUS_TTL, json.dumps(status))
 
 def get_system_status():
     """

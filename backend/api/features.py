@@ -9,8 +9,6 @@ from backend.models.schemas import FeatureStoreInput
 from backend.services.rate_limiter import limiter
  
 router = APIRouter()
- 
- 
 @router.post("/features/store")
 @limiter.limit("30/minute")
 def store_entity_features(
@@ -32,7 +30,7 @@ def store_entity_features(
     except Exception as e:
         return {"error": str(e)}
  
- 
+
 @router.get("/features/list")
 def list_features():
     try:
@@ -44,7 +42,6 @@ def list_features():
     except Exception as e:
         return {"error": str(e)}
  
- 
 @router.get("/features/{entity_id}")
 def get_features(entity_id: str):
     try:
@@ -54,7 +51,7 @@ def get_features(entity_id: str):
         return record
     except Exception as e:
         return {"error": str(e)}
- 
+
  
 @router.get("/features/{entity_id}/history")
 def get_features_history(entity_id: str):

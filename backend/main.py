@@ -1,48 +1,106 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from backend.api import incidents
+from backend.api import aws
+from backend.core.config import settings
+from backend.core.logger import get_logger
+from backend.services.metrics_analyzer import start_metrics_analyzer
+from backend.models.database import init_db
+from backend.services.log_clusterer import run_daily_clustering
+import threading
+import time
+
+# Routers
 from backend.api import (
-    inframind, opsgpt, failure, scalewise,
-    autohealing, streaming, buildsense, deployguard, auth, features,registry,pipeline
+    auth, inframind, opsgpt, failure, scalewise,
+    autohealing, buildsense, deployguard, streaming,
+    features, registry, pipeline, health
 )
 
-from backend.models.database import init_db
-from backend.services.rate_limiter import limiter
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="NeuroOps API",
-    description="AI Powered Self-Healing Cloud Platform",
-    version="1.0.0"
+    description="""
+    ## 🤖 AI-Powered Infrastructure Operations Platform
+
+    NeuroOps provides intelligent automation for cloud infrastructure management.
+
+    ### Core Features:
+
+    - **🧠 InfraMind**: Real-time anomaly detection using Isolation Forest
+      - Detects CPU/memory spikes
+      - Identifies unusual patterns
+      - Returns anomaly scores with severity levels
+
+    - **⚠️ Failure Predictor**: ML-based failure prediction
+      - Predicts EC2 instance failures before they happen
+      - Uses Random Forest with 24 sensor inputs
+      - Returns probability and recommended actions
+
+    - **⏱️ RUL Predictor**: Remaining Useful Life estimation
+      - Predicts when an instance will fail
+      - Provides confidence intervals
+      - Suggests maintenance windows
+
+    - **🛠️ Auto-Healing**: Automated remediation
+      - Triggers on anomaly detection
+      - Restarts services, scales resources
+      - Tracks healing history and success rates
+
+    - **💰 ScaleWise**: Cost optimization
+      - Analyzes instance utilization
+      - Recommends right-sizing
+      - Shows potential savings
+
+    - **📝 OpsGPT**: Log analysis
+      - Analyzes error logs using LLM
+      - Clusters similar errors
+      - Provides root cause analysis
+
+    ### Authentication:
+    Use `/api/v1/auth/login` to get JWT token.
+    Include in header: `Authorization: Bearer <token>`
+
+    ### Rate Limits:
+    - 60 requests per minute for prediction endpoints
+    - 30 requests per minute for analysis endpoints
+    """,
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    contact={
+        "name": "NeuroOps Team",
+        "email": "neuroops@example.com",
+    },
+    license_info={
+        "name": "MIT",
+    },
 )
 
-# attach limiter to app
 app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# handle rate limit errors cleanly
-@app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={
-            "error"  : "Rate limit exceeded",
-            "message": "Too many requests. Please slow down.",
-            "limit"  : str(exc.detail)
-        }
-    )
+logger = get_logger("main")
 
+# CORS - single instance
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup():
-    init_db()
+# Mount static dashboard
+app.mount("/dashboard", StaticFiles(directory="dashboard", html=True), name="dashboard")
 
-# v1 routes
+# Router registration
 app.include_router(auth.router,         prefix="/api/v1", tags=["Authentication"])
 app.include_router(inframind.router,    prefix="/api/v1", tags=["InfraMind"])
 app.include_router(opsgpt.router,       prefix="/api/v1", tags=["OpsGPT"])
@@ -52,15 +110,55 @@ app.include_router(autohealing.router,  prefix="/api/v1", tags=["Auto-Healing"])
 app.include_router(buildsense.router,   prefix="/api/v1", tags=["BuildSense"])
 app.include_router(deployguard.router,  prefix="/api/v1", tags=["DeployGuard"])
 app.include_router(streaming.router,    tags=["Live Streaming"])
-app.include_router(features.router, prefix="/api/v1", tags=["Feature Store"])
-app.include_router(registry.router, prefix="/api/v1", tags=["Model Registry"])
-app.include_router(pipeline.router, prefix="/api/v1", tags=["Data Pipeline"])
+app.include_router(features.router,     prefix="/api/v1", tags=["Feature Store"])
+app.include_router(registry.router,     prefix="/api/v1", tags=["Model Registry"])
+app.include_router(pipeline.router,     prefix="/api/v1", tags=["Data Pipeline"])
+app.include_router(health.router,       tags=["Health"])
+app.include_router(aws.router,          prefix="/api/v1", tags=["AWS"])
+app.include_router(incidents.router,    prefix="/api/v1", tags=["Incidents"])
+
+
+def run_daily_clustering_background():
+    """Run clustering once on startup, then every 24 hours"""
+    while True:
+        try:
+            logger.info("running_daily_log_clustering")
+            result = run_daily_clustering()
+            if result:
+                logger.info("daily_clustering_completed", clusters=result.get("n_clusters"))
+            else:
+                logger.info("daily_clustering_skipped_already_run_today")
+        except Exception as e:
+            logger.error("daily_clustering_failed", error=str(e))
+        # Wait 24 hours (86400 seconds)
+        time.sleep(86400)
+
+
+@app.on_event("startup")
+def startup():
+    """Initialize database, start metric analyzer, and start daily clustering scheduler"""
+    init_db()
+    logger.info("neuroops_started", version=settings.APP_VERSION)
+    
+    # Start metrics analyzer (runs every 60 seconds)
+    start_metrics_analyzer(interval_seconds=60)
+    
+    # Start daily clustering in background thread
+    clustering_thread = threading.Thread(target=run_daily_clustering_background, daemon=True)
+    clustering_thread.start()
+    logger.info("daily_clustering_scheduler_started")
+
 
 @app.get("/")
 def home():
     return {
-        "platform": "NeuroOps",
-        "version" : "1.0.0",
-        "api_v1"  : "/api/v1",
-        "docs"    : "/docs"
+        "platform": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "api": "/api/v1",
+        "docs": "/docs"
     }
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}

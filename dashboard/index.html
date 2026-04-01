@@ -2,25 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroOps Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>NeuroOps Dashboard | AI Infrastructure Platform -By R4m</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
         :root {
-            --bg         : #060910;
-            --bg2        : #0a0f1a;
-            --bg3        : #0d1520;
-            --border     : #1a2a3a;
-            --border2    : #243548;
-            --cyan       : #00d4ff;
-            --purple     : #7c3aed;
-            --green      : #00ff88;
-            --red        : #ff4455;
-            --yellow     : #ffaa00;
-            --text       : #c8d8e8;
-            --text2      : #6a8aaa;
-            --text3      : #3a5a7a;
+            --bg: #060910;
+            --bg2: #0a0f1a;
+            --bg3: #0d1520;
+            --border: #1a2a3a;
+            --border2: #243548;
+            --cyan: #00d4ff;
+            --purple: #7c3aed;
+            --green: #00ff88;
+            --red: #ff4455;
+            --yellow: #ffaa00;
+            --text: #c8d8e8;
+            --text2: #6a8aaa;
+            --text3: #3a5a7a;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -31,9 +31,9 @@
             color: var(--text);
             min-height: 100vh;
             overflow-x: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
-        /* grid background */
         body::before {
             content: '';
             position: fixed;
@@ -46,24 +46,141 @@
             z-index: 0;
         }
 
-        /* ── HEADER ── */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            min-width: 300px;
+            max-width: 400px;
+            background: var(--bg2);
+            border-left: 4px solid;
+            border-radius: 8px;
+            padding: 14px 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+            cursor: pointer;
+        }
+
+        .toast.critical { border-left-color: var(--red); }
+        .toast.warning { border-left-color: var(--yellow); }
+        .toast.normal { border-left-color: var(--green); }
+        .toast.info { border-left-color: var(--cyan); }
+
+        .toast-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .toast.critical .toast-title { color: var(--red); }
+        .toast.warning .toast-title { color: var(--yellow); }
+        .toast.normal .toast-title { color: var(--green); }
+
+        .toast-message {
+            font-size: 12px;
+            color: var(--text2);
+        }
+
+        .toast-time {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 6px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: var(--bg2);
+            border: 1px solid var(--cyan);
+            border-radius: 16px;
+            padding: 32px;
+            width: 360px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0,212,255,0.2);
+        }
+        .modal-content h2 {
+            color: var(--cyan);
+            margin-bottom: 24px;
+            font-size: 24px;
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .modal-content button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 16px;
+        }
+        .error-msg {
+            color: var(--red);
+            margin-top: 12px;
+            font-size: 12px;
+        }
+
         .header {
             position: relative;
             z-index: 10;
-            background: linear-gradient(180deg, #0a0f1a 0%, transparent 100%);
+            background: linear-gradient(180deg, var(--bg2) 0%, transparent 100%);
             border-bottom: 1px solid var(--border);
-            padding: 0 40px;
+            padding: 0 20px;
             display: flex;
-            align-items: stretch;
-            gap: 0;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
         .logo-area {
-            padding: 20px 0;
-            margin-right: 40px;
+            padding: 16px 0;
             display: flex;
             flex-direction: column;
-            justify-content: center;
         }
 
         .logo {
@@ -83,12 +200,28 @@
             margin-top: 2px;
         }
 
-        /* ── TABS ── */
         .tabs {
             display: flex;
-            align-items: stretch;
-            gap: 0;
+            align-items: center;
+            gap: 4px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
             flex: 1;
+        }
+
+        .tabs::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        .tabs::-webkit-scrollbar-track {
+            background: var(--bg3);
+        }
+
+        .tabs::-webkit-scrollbar-thumb {
+            background: var(--cyan);
+            border-radius: 3px;
         }
 
         .tab {
@@ -98,7 +231,7 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             color: var(--text3);
-            padding: 0 20px;
+            padding: 8px 14px;
             cursor: pointer;
             border: none;
             background: none;
@@ -108,32 +241,175 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            flex-shrink: 0;
+            border-radius: 6px 6px 0 0;
         }
 
-        .tab:hover { color: var(--text); }
-
-        .tab.active {
-            color: var(--cyan);
-            border-bottom-color: var(--cyan);
-            background: rgba(0,212,255,0.04);
-        }
-
-        .tab .dot {
-            width: 5px; height: 5px;
-            border-radius: 50%;
-            background: var(--text3);
-        }
-
+        .tab:hover { color: var(--text); background: rgba(0,212,255,0.05); }
+        .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); background: rgba(0,212,255,0.04); }
+        .tab .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text3); }
         .tab.active .dot { background: var(--cyan); }
 
-        /* header right */
         .header-right {
             display: flex;
             align-items: center;
-            gap: 16px;
-            padding: 0 0 0 20px;
-            border-left: 1px solid var(--border);
-            margin-left: auto;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .notification-bell {
+            position: relative;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .bell-icon {
+            font-size: 22px;
+            color: var(--text2);
+            transition: color 0.2s;
+        }
+        .notification-bell:hover .bell-icon {
+            color: var(--cyan);
+        }
+        .bell-badge {
+            position: absolute;
+            top: -6px;
+            right: -8px;
+            background: var(--red);
+            color: white;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 2px 5px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+        .notification-dropdown {
+            position: absolute;
+            top: 35px;
+            right: 0;
+            width: 380px;
+            max-height: 500px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            z-index: 100;
+            overflow: hidden;
+            display: none;
+        }
+        .notification-bell:hover .notification-dropdown {
+            display: block;
+        }
+        .dropdown-header {
+            padding: 12px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--cyan);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg3);
+        }
+        .notification-list {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .notification-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .notification-item:hover {
+            background: var(--bg3);
+        }
+        .notification-item.unread {
+            background: rgba(0,212,255,0.05);
+            border-left: 3px solid var(--cyan);
+        }
+        .notification-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text);
+        }
+        .notification-meta {
+            font-size: 10px;
+            color: var(--text3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .notification-severity {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .notification-severity.critical { background: rgba(255,68,85,0.2); color: var(--red); }
+        .notification-severity.warning { background: rgba(255,170,0,0.2); color: var(--yellow); }
+        .notification-severity.normal { background: rgba(0,255,136,0.2); color: var(--green); }
+        .notification-full-text {
+            font-size: 12px;
+            color: var(--text2);
+            margin-top: 8px;
+            line-height: 1.5;
+            background: var(--bg);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: none;
+        }
+        .notification-full-text.show {
+            display: block;
+        }
+        .notification-action-status {
+            font-size: 10px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .action-taken {
+            color: var(--green);
+        }
+        .action-not-taken {
+            color: var(--red);
+        }
+        .expand-btn {
+            font-size: 10px;
+            color: var(--cyan);
+            cursor: pointer;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        .expand-btn:hover {
+            text-decoration: underline;
+        }
+        .notification-empty {
+            padding: 32px;
+            text-align: center;
+            color: var(--text3);
+            font-size: 12px;
+        }
+
+        .theme-toggle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            background: none;
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            background: var(--bg3);
+            color: var(--text);
+            transition: all 0.2s;
+        }
+        .theme-toggle:hover {
+            border-color: var(--cyan);
+            transform: scale(1.02);
         }
 
         .live-badge {
@@ -146,6 +422,20 @@
             animation: pulse 2s infinite;
         }
 
+        .logout-btn {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--red);
+            background: none;
+            border: 1px solid var(--red);
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: rgba(255,68,85,0.1);
+        }
+
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
         .time-display {
@@ -154,125 +444,105 @@
             color: var(--text3);
         }
 
-        /* ── CONTENT ── */
         .content {
             position: relative;
             z-index: 1;
-            padding: 30px 40px;
+            padding: 24px;
+        }
+
+        @media (min-width: 768px) {
+            .content { padding: 32px 40px; }
         }
 
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* ── STAT CARDS ── */
         .stats-row {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 16px;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }
 
         .stat-card {
             background: var(--bg2);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 18px 20px;
-            position: relative;
-            overflow: hidden;
+            border-radius: 12px;
+            padding: 16px 20px;
             transition: border-color 0.3s;
         }
 
-        .stat-card::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--cyan), transparent);
-        }
-
         .stat-card:hover { border-color: var(--border2); }
-
         .stat-label {
             font-family: 'JetBrains Mono', monospace;
             font-size: 10px;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             text-transform: uppercase;
             color: var(--text3);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 800;
-            color: var(--cyan);
-            line-height: 1;
-        }
-
+        .stat-value { font-size: 32px; font-weight: 800; color: var(--cyan); line-height: 1; }
         .stat-value.green  { color: var(--green); }
         .stat-value.purple { color: var(--purple); }
         .stat-value.yellow { color: var(--yellow); }
         .stat-value.red    { color: var(--red); }
+        .stat-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 6px; }
 
-        .stat-meta {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text3);
-            margin-top: 6px;
-        }
+        .grid-2 { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px; }
 
-        /* ── PANELS ── */
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .grid-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
+        @media (min-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr 1fr; }
+            .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
         }
 
         .panel {
             background: var(--bg2);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 22px;
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 20px;
         }
-
         .panel:last-child { margin-bottom: 0; }
-
         .panel-title {
             font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
             font-weight: 700;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             text-transform: uppercase;
             color: var(--cyan);
-            margin-bottom: 18px;
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: wrap;
         }
-
         .panel-title .badge {
             background: rgba(0,212,255,0.1);
             border: 1px solid rgba(0,212,255,0.2);
             color: var(--cyan);
             font-size: 9px;
             padding: 2px 8px;
-            border-radius: 3px;
+            border-radius: 4px;
         }
 
-        /* ── INPUTS ── */
-        .input-row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
+        .input-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+            width: 100%;
+        }
+
+        .input-group:last-child {
+            margin-bottom: 0;
         }
 
         input, select, textarea {
@@ -281,28 +551,30 @@
             background: var(--bg3);
             border: 1px solid var(--border);
             color: var(--text);
-            padding: 9px 12px;
-            border-radius: 6px;
-            flex: 1;
-            min-width: 120px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            width: 100%;
             outline: none;
             transition: border-color 0.2s;
+            box-sizing: border-box;
         }
 
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--border2);
+        input:focus, select:focus, textarea:focus { border-color: var(--border2); }
+        textarea { height: 72px; resize: vertical; }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
         }
 
-        textarea {
-            width: 100%;
-            height: 72px;
-            resize: none;
-            margin-bottom: 12px;
+        .input-row .input-group {
+            flex: 1;
+            min-width: 100px;
+            margin-bottom: 0;
         }
 
-        select option { background: var(--bg3); }
-
-        /* ── BUTTONS ── */
         .btn {
             font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
@@ -315,79 +587,45 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #0055aa, var(--purple));
-            color: white;
-        }
-
+        .btn-primary { background: linear-gradient(135deg, #0055aa, var(--purple)); color: white; }
         .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #aa0011, var(--red));
-            color: white;
-        }
-
+        .btn-danger { background: linear-gradient(135deg, #aa0011, var(--red)); color: white; }
         .btn-danger:hover { opacity: 0.85; }
+        .btn-success { background: linear-gradient(135deg, #005522, var(--green)); color: #000; }
+        .btn-sm { padding: 6px 14px; font-size: 10px; }
 
-        .btn-success {
-            background: linear-gradient(135deg, #005522, var(--green));
-            color: #000;
-        }
-
-        .btn-success:hover { opacity: 0.85; }
-
-        .btn-sm {
-            padding: 6px 14px;
-            font-size: 10px;
-        }
-
-        /* ── RESPONSE BOX ── */
         .response-box {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
+            font-size: 11px;
             background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 14px;
-            min-height: 80px;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 70px;
             white-space: pre-wrap;
             color: var(--green);
             margin-top: 12px;
             overflow-y: auto;
-            max-height: 300px;
+            max-height: 250px;
         }
-
-        .response-box.error   { color: var(--red); }
+        .response-box.error { color: var(--red); }
         .response-box.loading { color: var(--text3); font-style: italic; }
 
-        /* ── ALERT ITEMS ── */
         .alert-item {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 10px 14px;
+            padding: 8px 12px;
             border-radius: 6px;
             margin-bottom: 6px;
             background: var(--bg3);
             border-left: 3px solid var(--border);
         }
-
         .alert-item.critical { border-left-color: var(--red); }
         .alert-item.warning  { border-left-color: var(--yellow); }
-        .alert-item.normal   { border-left-color: var(--green); }
-
-        .alert-dot {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background: var(--green);
-            flex-shrink: 0;
-        }
-
+        .alert-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
         .alert-dot.critical { background: var(--red); }
         .alert-dot.warning  { background: var(--yellow); }
-
-        /* ── TAGS ── */
         .tag {
             font-family: 'JetBrains Mono', monospace;
             font-size: 10px;
@@ -395,822 +633,1217 @@
             padding: 2px 8px;
             border-radius: 3px;
         }
-
         .tag.critical { background: rgba(255,68,85,0.15); color: var(--red); }
         .tag.warning  { background: rgba(255,170,0,0.15); color: var(--yellow); }
         .tag.normal   { background: rgba(0,255,136,0.15); color: var(--green); }
-        .tag.medium   { background: rgba(255,170,0,0.15); color: var(--yellow); }
-        .tag.low      { background: rgba(0,255,136,0.15); color: var(--green); }
-        .tag.high     { background: rgba(255,68,85,0.15);  color: var(--red); }
-        .tag.active   { background: rgba(0,212,255,0.15); color: var(--cyan); }
-        .tag.archived { background: rgba(106,138,170,0.15); color: var(--text2); }
 
-        /* ── CHART ── */
-        .chart-wrap {
-            position: relative;
-            height: 200px;
+        .chart-wrap { position: relative; height: 200px; }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
         }
-
-        /* ── DIVIDER ── */
-        .divider {
-            border: none;
-            border-top: 1px solid var(--border);
-            margin: 16px 0;
-        }
-
-        /* ── MODEL CARD ── */
-        .model-card {
-            background: var(--bg3);
+        .card {
+            background: var(--bg2);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 10px;
+            border-radius: 12px;
+            padding: 18px;
         }
-
-        .model-card-title {
-            font-weight: 700;
-            font-size: 14px;
-            margin-bottom: 6px;
+        .card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            margin-bottom: 14px;
+            color: var(--cyan);
         }
-
-        .model-meta {
+        .card label {
+            display: block;
+            font-size: 10px;
+            color: var(--text2);
+            margin-bottom: 5px;
+            margin-top: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .card button {
+            margin-top: 14px;
+            width: 100%;
+            background: linear-gradient(135deg, #0055aa, var(--purple));
+            color: white;
+            border: none;
             font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
-            color: var(--text2);
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .card button:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+        }
+        .result-box {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 180px;
+            overflow-y: auto;
+            color: var(--green);
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 0 16px;
+            }
+            .logo-area { padding: 12px 0; text-align: center; }
+            .tabs { order: 2; padding-bottom: 8px; }
+            .tab { padding: 6px 10px; font-size: 9px; }
+            .header-right {
+                order: 1;
+                justify-content: flex-end;
+                border-left: none;
+                padding-bottom: 8px;
+            }
+            .content { padding: 16px; }
+            .stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stat-card { padding: 10px; }
+            .stat-value { font-size: 22px; }
+            .grid-2, .grid-3 { gap: 12px; }
+            .panel { padding: 14px; }
+            .input-row { flex-direction: column; gap: 8px; }
+            .input-row .input-group { min-width: 100%; }
+            .btn { width: 100%; }
+            .notification-dropdown { width: 320px; right: -20px; }
+            .toast-container { width: calc(100% - 40px); right: 20px; left: 20px; }
+            .toast { width: 100%; min-width: auto; }
+        }
+
+        @media (max-width: 480px) {
+            .stats-row { grid-template-columns: 1fr; }
+            .notification-dropdown { width: 300px; right: -40px; }
+            .tab { padding: 4px 8px; font-size: 8px; }
+        }
+
+        .timeline-bar {
             display: flex;
-            gap: 16px;
+            gap: 8px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
         }
-
-        /* ── PIPELINE STAGE ── */
-        .stage-item {
+        .timeline-day {
+            flex: 1;
+            min-width: 60px;
+            text-align: center;
+        }
+        .timeline-day-label {
+            font-size: 10px;
+            color: var(--text3);
+            margin-bottom: 4px;
+        }
+        .timeline-bars {
+            height: 60px;
             display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 0;
+            flex-direction: column-reverse;
+            gap: 2px;
+        }
+        .timeline-success {
+            background: var(--green);
+            border-radius: 2px;
+            transition: height 0.3s;
+        }
+        .timeline-failed {
+            background: var(--red);
+            border-radius: 2px;
+            transition: height 0.3s;
+        }
+        .timeline-total {
+            font-size: 10px;
+            margin-top: 4px;
+            color: var(--text2);
+        }
+        .healing-table {
+            width: 100%;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            border-collapse: collapse;
+        }
+        .healing-table th {
+            color: var(--cyan);
+            text-align: left;
+            padding: 8px 4px;
             border-bottom: 1px solid var(--border);
         }
-
-        .stage-item:last-child { border-bottom: none; }
-
-        .stage-icon {
-            width: 28px; height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 700;
-            flex-shrink: 0;
+        .healing-table td {
+            padding: 6px 4px;
+            border-bottom: 1px solid var(--border);
         }
-
-        .stage-icon.success { background: rgba(0,255,136,0.15); color: var(--green); }
-        .stage-icon.failed  { background: rgba(255,68,85,0.15);  color: var(--red); }
-        .stage-icon.pending { background: rgba(106,138,170,0.1); color: var(--text3); }
-
-        /* scrollbar */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: var(--bg); }
-        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
     </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<div class="header">
-    <div class="logo-area">
-        <div class="logo">NeuroOps</div>
-        <div class="logo-sub">AI INFRA PLATFORM · BY R4M</div>
-    </div>
+<div class="toast-container" id="toastContainer"></div>
 
-    <div class="tabs" id="tab-nav">
-        <button class="tab active" onclick="switchTab('overview')" data-tab="overview">
-            <span class="dot"></span>Overview
-        </button>
-        <button class="tab" onclick="switchTab('inframind')" data-tab="inframind">
-            <span class="dot"></span>InfraMind
-        </button>
-        <button class="tab" onclick="switchTab('opsgpt')" data-tab="opsgpt">
-            <span class="dot"></span>OpsGPT
-        </button>
-        <button class="tab" onclick="switchTab('failure')" data-tab="failure">
-            <span class="dot"></span>Failure
-        </button>
-        <button class="tab" onclick="switchTab('scalewise')" data-tab="scalewise">
-            <span class="dot"></span>ScaleWise
-        </button>
-        <button class="tab" onclick="switchTab('healing')" data-tab="healing">
-            <span class="dot"></span>Auto-Heal
-        </button>
-        <button class="tab" onclick="switchTab('builddeploy')" data-tab="builddeploy">
-            <span class="dot"></span>Build/Deploy
-        </button>
-        <button class="tab" onclick="switchTab('mlops')" data-tab="mlops">
-            <span class="dot"></span>MLOps
-        </button>
-    </div>
-
-    <div class="header-right">
-        <span class="time-display" id="clock">--:--:--</span>
-        <span class="live-badge" id="live-badge">● CONNECTING</span>
+<div id="loginModal" class="modal">
+    <div class="modal-content">
+        <h2> NeuroOps</h2>
+        <input type="text" id="loginUsername" placeholder="Username" value="admin">
+        <input type="password" id="loginPassword" placeholder="Password" value="admin123">
+        <button onclick="doLogin()">Login</button>
+        <div id="loginError" class="error-msg"></div>
     </div>
 </div>
 
-<!-- CONTENT -->
+<div class="header">
+    <div class="logo-area">
+        <div class="logo">NeuroOps</div>
+        <div class="logo-sub">ai infra platform</div>
+    </div>
+    <div class="tabs" id="tab-nav">
+        <button class="tab active" onclick="switchTab('overview')" data-tab="overview"><span class="dot"></span>overview</button>
+        <button class="tab" onclick="switchTab('inframind')" data-tab="inframind"><span class="dot"></span>inframind</button>
+        <button class="tab" onclick="switchTab('opsgpt')" data-tab="opsgpt"><span class="dot"></span>opsgpt</button>
+        <button class="tab" onclick="switchTab('failure')" data-tab="failure"><span class="dot"></span>failure</button>
+        <button class="tab" onclick="switchTab('scalewise')" data-tab="scalewise"><span class="dot"></span>scalewise</button>
+        <button class="tab" onclick="switchTab('healing')" data-tab="healing"><span class="dot"></span>auto-heal</button>
+        <button class="tab" onclick="switchTab('builddeploy')" data-tab="builddeploy"><span class="dot"></span>build/deploy</button>
+        <button class="tab" onclick="switchTab('mlops')" data-tab="mlops"><span class="dot"></span>mlops</button>
+        <button class="tab" onclick="switchTab('aws')" data-tab="aws"><span class="dot"></span>AWS</button>
+    </div>
+    <div class="header-right">
+        <div class="notification-bell" id="notificationBell">
+            <span class="bell-icon">🔔</span>
+            <span class="bell-badge" id="bellBadge" style="display: none;">0</span>
+            <div class="notification-dropdown" id="notificationDropdown">
+                <div class="dropdown-header">Recent Incidents</div>
+                <div id="notificationList" class="notification-list">
+                    <div class="notification-empty">No recent incidents</div>
+                </div>
+            </div>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
+        <span class="time-display" id="clock">--:--:--</span>
+        <span class="live-badge" id="live-badge">● connecting</span>
+        <button class="logout-btn" onclick="logout()">logout</button>
+    </div>
+</div>
+
 <div class="content">
-
-    <!-- ══════════════════════════════════════════════
-         TAB 1 — OVERVIEW
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel active" id="tab-overview">
-
         <div class="stats-row">
-            <div class="stat-card">
-                <div class="stat-label">Anomalies / 24h</div>
-                <div class="stat-value red" id="stat-anomalies">0</div>
-                <div class="stat-meta">live detection</div>
+            <div class="stat-card"><div class="stat-label">anomalies / 24h</div><div class="stat-value red" id="stat-anomalies">0</div><div class="stat-meta">live detection</div></div>
+            <div class="stat-card"><div class="stat-label">system health</div><div class="stat-value green" id="stat-health">healthy</div><div class="stat-meta">overall status</div></div>
+            <div class="stat-card"><div class="stat-label">ml models</div><div class="stat-value purple">6</div><div class="stat-meta">isoforest · rf · gb · rul×2</div></div>
+            <div class="stat-card"><div class="stat-label">api endpoints</div><div class="stat-value" style="color:var(--cyan)">30+</div><div class="stat-meta">all modules active</div></div>
+            <div class="stat-card"><div class="stat-label">modules online</div><div class="stat-value green">8</div><div class="stat-meta">all systems go</div></div>
+        </div>
+        
+        <div class="grid-2" style="margin-bottom: 20px;">
+            <div class="panel">
+                <div class="panel-title">📊 Model Health</div>
+                <div id="model-health" style="display: flex; gap: 16px; flex-wrap: wrap;">
+                    <div><span style="color: var(--cyan);">InfraMind</span> <span id="model-infra" class="tag normal">healthy</span></div>
+                    <div><span style="color: var(--cyan);">Failure Predictor</span> <span id="model-failure" class="tag normal">active</span></div>
+                    <div><span style="color: var(--cyan);">RUL Models</span> <span id="model-rul" class="tag normal">active</span></div>
+                    <div><span style="color: var(--cyan);">Drift</span> <span id="model-drift" class="tag normal">0%</span></div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">System Health</div>
-                <div class="stat-value green" id="stat-health">HEALTHY</div>
-                <div class="stat-meta">overall status</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">ML Models</div>
-                <div class="stat-value purple">6</div>
-                <div class="stat-meta">IsoForest · RF · GB · RUL×2</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">API Endpoints</div>
-                <div class="stat-value" style="color:var(--cyan)">30+</div>
-                <div class="stat-meta">all modules active</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Modules Online</div>
-                <div class="stat-value green">8</div>
-                <div class="stat-meta">all systems go</div>
+            <div class="panel">
+                <div class="panel-title">💰 Cost Impact</div>
+                <div id="cost-impact">
+                    <div style="font-size: 24px; color: var(--green);" id="savings-amount">$0.00</div>
+                    <div style="font-size: 12px; color: var(--text2);" id="savings-recommendation">loading...</div>
+                </div>
             </div>
         </div>
-
+        
         <div class="grid-2">
-            <div class="panel">
-                <div class="panel-title">Anomaly Score Stream <span class="badge">LIVE</span></div>
-                <div class="chart-wrap">
-                    <canvas id="anomalyChart"></canvas>
-                </div>
-            </div>
-            <div class="panel">
-                <div class="panel-title">Live Service Monitor <span class="badge">WS</span></div>
-                <div id="service-grid">
-                    <div class="response-box loading">Connecting to WebSocket stream...</div>
-                </div>
+            <div class="panel"><div class="panel-title">anomaly score stream <span class="badge">live</span></div><div class="chart-wrap"><canvas id="anomalyChart"></canvas></div></div>
+            <div class="panel"><div class="panel-title">live service monitor <span class="badge">ws</span></div><div id="service-grid"><div class="response-box loading">connecting to websocket stream...</div></div></div>
+        </div>
+        <div class="panel"><div class="panel-title">alert feed <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="loadAlerts()">refresh</button></div><div id="alert-feed"><div class="response-box loading">loading alerts...</div></div></div>
+        
+        <div class="panel">
+            <div class="panel-title">🕐 Healing Timeline <span class="badge">last 7 days</span></div>
+            <div id="healing-timeline">
+                <div class="response-box loading">loading healing history...</div>
             </div>
         </div>
-
+        
         <div class="panel">
-            <div class="panel-title">
-                Alert Feed
-                <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="loadAlerts()">Refresh</button>
-            </div>
-            <div id="alert-feed">
-                <div class="response-box loading">Loading alerts...</div>
-            </div>
+            <div class="panel-title">📈 Capacity Planner <span class="badge">ML Forecast</span></div>
+            <button class="btn btn-primary" onclick="loadCapacityPlan()">Generate Forecast</button>
+            <div id="capacity-result" class="response-box loading">Click to predict future needs...</div>
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 2 — INFRAMIND
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-inframind">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">Anomaly Detection <span class="badge">ISOLATION FOREST</span></div>
+                <div class="panel-title">anomaly detection <span class="badge">isolation forest</span></div>
                 <div class="input-row">
-                    <input type="number" id="inf-value" placeholder="Metric value" value="99.9">
-                    <input type="number" id="inf-mean"  placeholder="Rolling mean"  value="20.0">
-                    <input type="number" id="inf-std"   placeholder="Rolling std"   value="45.0">
-                    <input type="number" id="inf-diff"  placeholder="Value diff"    value="79.9">
+                    <div class="input-group"><label class="input-label">metric value</label><input type="number" id="metric-value" value="99.9"></div>
+                    <div class="input-group"><label class="input-label">rolling mean</label><input type="number" id="rolling-mean" value="20.0"></div>
+                    <div class="input-group"><label class="input-label">rolling std</label><input type="number" id="rolling-std" value="45.0"></div>
+                    <div class="input-group"><label class="input-label">value diff</label><input type="number" id="value-diff" value="79.9"></div>
                 </div>
-                <button class="btn btn-primary" onclick="runInfraMind()">Analyze Metric</button>
-                <div class="response-box loading" id="inf-result">Waiting for input...</div>
+                <button class="btn btn-primary" onclick="runInfraMind()">analyze metric</button>
+                <div class="response-box loading" id="inf-result">waiting for input...</div>
             </div>
-            <div class="panel">
-                <div class="panel-title">Drift Detection <span class="badge">PSI</span></div>
-                <p style="font-size:13px; color:var(--text2); margin-bottom:14px">
-                    Check if the InfraMind model has drifted from its baseline anomaly rate.
-                </p>
-                <button class="btn btn-primary" onclick="runDrift()">Check Drift</button>
-                <div class="response-box loading" id="drift-result">Waiting...</div>
-            </div>
+            <div class="panel"><div class="panel-title">drift detection <span class="badge">psi</span></div><button class="btn btn-primary" onclick="runDrift()">check drift</button><div class="response-box loading" id="drift-result">waiting...</div></div>
         </div>
-        <div class="panel">
-            <div class="panel-title">Score History</div>
-            <div class="chart-wrap">
-                <canvas id="infChart"></canvas>
-            </div>
-        </div>
+        <div class="panel"><div class="panel-title">score history</div><div class="chart-wrap"><canvas id="infChart"></canvas></div></div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 3 — OPSGPT
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-opsgpt">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">Log Analysis <span class="badge">PHI-3 MINI</span></div>
-                <textarea id="ops-log" placeholder="Paste log error here...">ERROR: Database connection timeout after 30s. Max retries exceeded. Service unavailable.</textarea>
-                <button class="btn btn-primary" onclick="runOpsGPT()">Analyze Log</button>
-                <div class="response-box loading" id="ops-result">Waiting for log input...</div>
+                <div class="panel-title">log analysis <span class="badge">phi-3 mini</span></div>
+                <textarea id="log-input">ERROR: Database connection timeout after 30s. Max retries exceeded. Service unavailable.</textarea>
+                <button class="btn btn-primary" onclick="runOpsGPT()">analyze log</button>
+                <div class="response-box loading" id="ops-result">waiting for log input...</div>
             </div>
             <div class="panel">
-                <div class="panel-title">Log Clustering <span class="badge">KMEANS</span></div>
-                <div class="input-row">
-                    <input type="number" id="cluster-n" placeholder="Clusters" value="8" min="2" max="20">
-                </div>
-                <button class="btn btn-primary" onclick="runClusters()">Run Clustering</button>
-                <div class="response-box loading" id="cluster-result">Waiting...</div>
+                <div class="panel-title">log clustering <span class="badge">kmeans</span></div>
+                <div class="input-group"><label class="input-label">number of clusters</label><input type="number" id="n-clusters" value="8" min="2" max="20"></div>
+                <button class="btn btn-primary" onclick="runClusters()">run clustering</button>
+                <div class="response-box loading" id="cluster-result">waiting...</div>
             </div>
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 4 — FAILURE
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-failure">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">Binary Failure Predict <span class="badge">RANDOM FOREST</span></div>
+                <div class="panel-title">binary failure predict <span class="badge">random forest</span></div>
                 <div class="input-row">
-                    <input type="text"   id="fail-unit" placeholder="Unit ID"  value="engine_01">
-                    <input type="number" id="fail-s1"   placeholder="sensor1"  value="518.67">
-                    <input type="number" id="fail-s2"   placeholder="sensor2"  value="642.15">
-                    <input type="number" id="fail-s3"   placeholder="sensor3"  value="1590.0">
+                    <div class="input-group"><label class="input-label">unit id</label><input type="text" id="unit-id" value="i-00dfb80a59da9a56d"></div>
+                    <div class="input-group"><label class="input-label">CPU Usage (%)</label><input type="number" id="sensor1" value="0.0" step="0.1"></div>
+                    <div class="input-group"><label class="input-label">Status Check</label>
+                        <select id="sensor2"><option value="1">OK</option><option value="0">FAILING</option></select>
+                    </div>
+                    <div class="input-group"><label class="input-label">Recent Reboots</label><input type="number" id="sensor3" value="0" step="1"></div>
+                    <div class="input-group"><label class="input-label">Instance Age (days)</label><input type="number" id="sensor4" value="30" step="1"></div>
                 </div>
-                <button class="btn btn-primary" onclick="runFailure()">Predict Failure</button>
-                <div class="response-box loading" id="fail-result">Waiting...</div>
+                <button class="btn btn-primary" onclick="runFailure()">predict failure</button>
+                <div class="response-box loading" id="fail-result">waiting...</div>
             </div>
             <div class="panel">
-                <div class="panel-title">RUL Countdown <span class="badge">REGRESSOR</span></div>
-                <p style="font-size:13px; color:var(--text2); margin-bottom:14px">
-                    Uses same sensor values as Failure Predict. Click below to get exact cycles remaining.
-                </p>
-                <button class="btn btn-primary" onclick="runCountdown()">Get Countdown</button>
-                <div class="response-box loading" id="countdown-result">Waiting...</div>
+                <div class="panel-title">rul countdown <span class="badge">regressor (24 sensors)</span></div>
+                <p style="font-size:12px; color:var(--text3); margin-bottom:12px">⚠️ Uses 24 sensors from turbofan model. Only CPU, Status, Reboots, Age are real; others are defaults.</p>
+                <button class="btn btn-primary" onclick="runCountdown()">get countdown</button>
+                <div class="response-box loading" id="countdown-result">waiting...</div>
             </div>
         </div>
         <div class="grid-2">
-            <div class="panel">
-                <div class="panel-title">A/B Model Test <span class="badge">RF vs GB</span></div>
-                <p style="font-size:13px; color:var(--text2); margin-bottom:14px">
-                    Runs both RUL models simultaneously and compares predictions.
-                </p>
-                <button class="btn btn-primary" onclick="runABTest()">Run A/B Test</button>
-                <div class="response-box loading" id="ab-result">Waiting...</div>
-            </div>
-            <div class="panel">
-                <div class="panel-title">Multi-Service Correlation <span class="badge">4 SERVICES</span></div>
-                <p style="font-size:13px; color:var(--text2); margin-bottom:14px">
-                    Detects if multiple services are failing together — infrastructure-level event.
-                </p>
-                <button class="btn btn-primary" onclick="runCorrelate()">Run Correlation</button>
-                <div class="response-box loading" id="correlate-result">Waiting...</div>
-            </div>
+            <div class="panel"><div class="panel-title">a/b model test <span class="badge">rf vs gb</span></div><button class="btn btn-primary" onclick="runABTest()">run a/b test</button><div class="response-box loading" id="ab-result">waiting...</div></div>
+            <div class="panel"><div class="panel-title">multi-service correlation <span class="badge">4 services</span></div><button class="btn btn-primary" onclick="runCorrelate()">run correlation</button><div class="response-box loading" id="correlate-result">waiting...</div></div>
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 5 — SCALEWISE
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-scalewise">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">Cost Optimizer <span class="badge">SINGLE INSTANCE</span></div>
-                <div class="input-row">
-                    <select id="sw-instance">
-                        <option value="m5.xlarge">m5.xlarge</option>
-                        <option value="m5.large">m5.large</option>
-                        <option value="t3.medium" selected>t3.medium</option>
-                        <option value="t3.micro">t3.micro</option>
-                        <option value="c5.xlarge">c5.xlarge</option>
-                        <option value="r5.large">r5.large</option>
-                    </select>
-                    <input type="number" id="sw-cpu" placeholder="CPU %" value="12">
-                    <input type="number" id="sw-ram" placeholder="RAM %" value="18">
-                </div>
-                <button class="btn btn-primary" onclick="runScaleWise()">Optimize Cost</button>
-                <div class="response-box loading" id="sw-result">Waiting...</div>
+                <div class="panel-title">cost optimizer <span class="badge">single instance</span></div>
+                <select id="instance-type">
+                    <option value="t2.micro">t2.micro</option><option value="t2.small">t2.small</option>
+                    <option value="t2.medium">t2.medium</option><option value="t3.micro">t3.micro</option>
+                    <option value="t3.small">t3.small</option><option value="t3.medium" selected>t3.medium</option>
+                    <option value="t3.large">t3.large</option><option value="m5.large">m5.large</option>
+                    <option value="m5.xlarge">m5.xlarge</option><option value="m5.2xlarge">m5.2xlarge</option>
+                    <option value="c5.large">c5.large</option><option value="c5.xlarge">c5.xlarge</option>
+                    <option value="r5.large">r5.large</option><option value="r5.xlarge">r5.xlarge</option>
+                </select>
+                <div class="input-group"><label class="input-label">cpu usage (%)</label><input type="number" id="cpu-usage" value="12"></div>
+                <div class="input-group"><label class="input-label">ram usage (%)</label><input type="number" id="ram-usage" value="18"></div>
+                <button class="btn btn-primary" onclick="runScaleWise()">optimize cost</button>
+                <div class="response-box loading" id="sw-result">waiting...</div>
             </div>
-            <div class="panel">
-                <div class="panel-title">EC2 Pricing Reference <span class="badge">REAL AWS</span></div>
-                <button class="btn btn-primary" onclick="runPricing()">Load Pricing</button>
-                <div class="response-box loading" id="pricing-result">Waiting...</div>
-            </div>
+            <div class="panel"><div class="panel-title">ec2 pricing reference <span class="badge">real aws</span></div><button class="btn btn-primary" onclick="runPricing()">load pricing</button><div class="response-box loading" id="pricing-result">waiting...</div></div>
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 6 — AUTO-HEAL
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-healing">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">Trigger Healing <span class="badge">MANUAL</span></div>
-                <div class="input-row">
-                    <input type="text" id="ah-service" placeholder="Service name" value="payment-service">
-                    <input type="number" id="ah-metric" placeholder="Metric value" value="99.9">
-                    <select id="ah-severity">
-                        <option value="critical">Critical</option>
-                        <option value="warning">Warning</option>
-                        <option value="normal">Normal</option>
-                    </select>
-                </div>
-                <button class="btn btn-danger" onclick="runAutoHealing()">Trigger Auto-Healing</button>
-                <div class="response-box loading" id="ah-result">Waiting...</div>
+                <div class="panel-title">trigger healing <span class="badge">manual</span></div>
+                <div class="input-group"><label class="input-label">service name</label><input type="text" id="heal-service" value="payment-service"></div>
+                <div class="input-group"><label class="input-label">metric</label><input type="number" id="heal-metric" value="99.9"></div>
+                <div class="input-group"><label class="input-label">severity</label><select id="heal-severity"><option value="critical">critical</option><option value="warning">warning</option><option value="normal">normal</option></select></div>
+                <button class="btn btn-danger" onclick="runAutoHealing()">trigger auto-healing</button>
+                <div class="response-box loading" id="ah-result">waiting...</div>
             </div>
-            <div class="panel">
-                <div class="panel-title">Healing Rules <span class="badge">CONFIG</span></div>
-                <button class="btn btn-primary" onclick="loadHealingRules()">Load Rules</button>
-                <div class="response-box loading" id="rules-result">Waiting...</div>
-            </div>
+            <div class="panel"><div class="panel-title">healing rules <span class="badge">config</span></div><button class="btn btn-primary" onclick="loadHealingRules()">load rules</button><div class="response-box loading" id="rules-result">waiting...</div></div>
         </div>
-        <div class="panel">
-            <div class="panel-title">Full Pipeline <span class="badge">END-TO-END</span></div>
+        <div class="panel"><div class="panel-title">full pipeline <span class="badge">end-to-end</span></div>
             <div class="input-row">
-                <input type="text" id="pipe-service"  placeholder="Service" value="payment-service">
-                <input type="number" id="pipe-metric" placeholder="Metric" value="95.5">
-                <select id="pipe-severity">
-                    <option value="critical">Critical</option>
-                    <option value="warning">Warning</option>
-                </select>
+                <div class="input-group"><label class="input-label">service name</label><input type="text" id="pipe-service" value="payment-service"></div>
+                <div class="input-group"><label class="input-label">metric</label><input type="number" id="pipe-metric" value="95.5"></div>
+                <div class="input-group"><label class="input-label">severity</label><select id="pipe-severity"><option value="critical">critical</option><option value="warning">warning</option></select></div>
             </div>
-            <button class="btn btn-danger" onclick="runPipeline()">Run Full Pipeline</button>
-            <div class="response-box loading" id="pipeline-result">Waiting...</div>
+            <button class="btn btn-danger" onclick="runPipeline()">run full pipeline</button>
+            <div class="response-box loading" id="pipeline-result">waiting...</div>
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 7 — BUILD/DEPLOY
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-builddeploy">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">BuildSense <span class="badge">CI SIMULATION</span></div>
-                <div class="input-row">
-                    <input type="text" id="build-service" placeholder="Service" value="payment-service">
-                    <input type="text" id="build-branch"  placeholder="Branch"  value="main">
-                </div>
-                <button class="btn btn-primary" onclick="runBuild()">Trigger Build</button>
-                <div class="response-box loading" id="build-result">Waiting...</div>
+                <div class="panel-title">buildsense <span class="badge">ci simulation</span></div>
+                <div class="input-group"><label class="input-label">service name</label><input type="text" id="build-service" value="payment-service"></div>
+                <div class="input-group"><label class="input-label">branch</label><input type="text" id="build-branch" value="main"></div>
+                <button class="btn btn-primary" onclick="runBuild()">trigger build</button>
+                <div class="response-box loading" id="build-result">waiting...</div>
             </div>
             <div class="panel">
-                <div class="panel-title">DeployGuard <span class="badge">RISK ANALYSIS</span></div>
-                <div class="input-row">
-                    <input type="text"   id="dg-service"  placeholder="Service"   value="payment-service">
-                    <input type="text"   id="dg-version"  placeholder="Version"   value="v2.1.0">
-                    <input type="number" id="dg-cpu"      placeholder="CPU %"     value="78">
-                    <input type="number" id="dg-mem"      placeholder="Memory %"  value="82">
-                    <input type="number" id="dg-err"      placeholder="Error %"   value="4.5">
-                    <input type="number" id="dg-fail"     placeholder="Failures"  value="3">
-                    <input type="number" id="dg-size"     placeholder="Size MB"   value="450">
-                </div>
-                <button class="btn btn-primary" onclick="runDeployGuard()">Predict Risk</button>
-                <div class="response-box loading" id="dg-result">Waiting...</div>
+                <div class="panel-title">deployguard <span class="badge">risk analysis</span></div>
+                <div class="input-group"><label class="input-label">service name</label><input type="text" id="deploy-service" value="payment-service"></div>
+                <div class="input-group"><label class="input-label">version</label><input type="text" id="deploy-version" value="v2.1.0"></div>
+                <div class="input-group"><label class="input-label">cpu usage (%)</label><input type="number" id="deploy-cpu" value="78"></div>
+                <div class="input-group"><label class="input-label">memory usage (%)</label><input type="number" id="deploy-mem" value="82"></div>
+                <div class="input-group"><label class="input-label">error rate (%)</label><input type="number" id="deploy-errors" value="4.5"></div>
+                <div class="input-group"><label class="input-label">recent failures</label><input type="number" id="deploy-failures" value="3"></div>
+                <div class="input-group"><label class="input-label">image size (mb)</label><input type="number" id="deploy-size" value="450"></div>
+                <button class="btn btn-primary" onclick="runDeployGuard()">predict risk</button>
+                <div class="response-box loading" id="dg-result">waiting...</div>
             </div>
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════
-         TAB 8 — MLOPS
-    ══════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-mlops">
         <div class="grid-3">
-            <div class="panel">
-                <div class="panel-title">Feature Store <span class="badge">REDIS</span></div>
-                <button class="btn btn-primary" onclick="loadFeatures()" style="margin-bottom:10px">List All Entities</button>
-                <div class="response-box loading" id="features-result">Waiting...</div>
-            </div>
-            <div class="panel">
-                <div class="panel-title">Model Registry <span class="badge">VERSIONED</span></div>
-                <button class="btn btn-primary" onclick="loadRegistry()" style="margin-bottom:10px">List All Models</button>
-                <div class="response-box loading" id="registry-result">Waiting...</div>
-            </div>
-            <div class="panel">
-                <div class="panel-title">Data Pipeline <span class="badge">3 STAGES</span></div>
-                <p style="font-size:12px; color:var(--text2); margin-bottom:12px">
-                    Runs metrics + sensor feature computation + drift check.
-                </p>
-                <button class="btn btn-success" onclick="runDataPipeline()" style="margin-bottom:10px">Run Pipeline</button>
-                <div class="response-box loading" id="datapipeline-result">Waiting...</div>
-            </div>
+            <div class="panel"><div class="panel-title">feature store <span class="badge">redis</span></div><button class="btn btn-primary" onclick="loadFeatures()">list all entities</button><div class="response-box loading" id="features-result">waiting...</div></div>
+            <div class="panel"><div class="panel-title">model registry <span class="badge">versioned</span></div><button class="btn btn-primary" onclick="loadRegistry()">list all models</button><div class="response-box loading" id="registry-result">waiting...</div></div>
+            <div class="panel"><div class="panel-title">data pipeline <span class="badge">3 stages</span></div><button class="btn btn-success" onclick="runDataPipeline()">run pipeline</button><div class="response-box loading" id="datapipeline-result">waiting...</div></div>
         </div>
     </div>
 
-</div><!-- /content -->
+    <div id="tab-aws" class="tab-panel">
+        <div class="section-grid">
+            <div class="card"><h3>AWS Connection Status</h3><button onclick="checkAWSStatus()">Check Status</button><div id="aws-status-result" class="result-box"></div></div>
+            <div class="card"><h3>Fetch CloudWatch Metrics</h3><label>Instance ID</label><input id="aws-instance-id" type="text" placeholder="i-0abc123def456789" /><label>Minutes (5-1440)</label><input id="aws-minutes" type="number" value="60" min="5" max="1440" /><button onclick="fetchAWSMetrics()">Fetch Metrics</button><div id="aws-metrics-result" class="result-box"></div></div>
+            <div class="card"><h3>EC2 Instances</h3><button onclick="listEC2Instances()">List Instances</button><div id="aws-instances-result" class="result-box"></div></div>
+            <div class="card"><h3>Upload Model to S3</h3><label>Local Path</label><input id="aws-local-path" type="text" placeholder="ml_models/saved/inframind_model.pkl" /><label>S3 Key</label><input id="aws-s3-key" type="text" placeholder="models/inframind_model.pkl" /><button onclick="uploadModel()">Upload</button><div id="aws-upload-result" class="result-box"></div></div>
+            <div class="card"><h3>S3 Model Store</h3><button onclick="listS3Models()">List Models</button><div id="aws-s3-result" class="result-box"></div></div>
+            <div class="card"><h3>Send SNS Alert</h3><label>Subject</label><input id="aws-sns-subject" type="text" placeholder="CRITICAL: Anomaly detected" /><label>Message</label><textarea id="aws-sns-message" rows="3" placeholder="Service showing CPU spike..."></textarea><button onclick="sendSNSAlert()">Send Alert</button><div id="aws-sns-result" class="result-box"></div></div>
+        </div>
+    </div>
+</div>
 
 <script>
 const API = "http://127.0.0.1:8000/api/v1";
-const WS  = "ws://127.0.0.1:8000/ws/stream";
+const WS = "ws://127.0.0.1:8000/ws/stream";
 
-// ── TAB SWITCHING ───────────────────────────────
+let authToken = localStorage.getItem('neuroops_token');
+
+function showToast(message, severity = 'info', title = null) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${severity}`;
+    
+    const titles = {
+        critical: '🔴 CRITICAL',
+        warning: '🟡 WARNING',
+        normal: '🟢 NORMAL',
+        info: '🔵 INFO'
+    };
+    
+    toast.innerHTML = `
+        <div class="toast-title">${title || titles[severity] || 'INFO'}</div>
+        <div class="toast-message">${message}</div>
+        <div class="toast-time">${new Date().toLocaleTimeString()}</div>
+    `;
+    
+    toast.onclick = () => {
+        toast.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    };
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+async function loadHealingTimeline() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const response = await fetch(`${API}/autohealing/timeline?days=7`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.error) {
+            document.getElementById('healing-timeline').innerHTML = `<div class="response-box error">${data.error}</div>`;
+            return;
+        }
+        
+        if (!data.timeline || Object.keys(data.timeline).length === 0) {
+            document.getElementById('healing-timeline').innerHTML = '<div class="response-box">No healing actions in the last 7 days</div>';
+            return;
+        }
+        
+        let html = `<div style="margin-bottom: 16px;">📊 Success Rate: <strong style="color: var(--green);">${data.success_rate}%</strong> | Total Actions: ${data.total_actions}</div>`;
+        
+        html += `<div class="timeline-bar">`;
+        for (const [date, stats] of Object.entries(data.timeline)) {
+            const successHeight = (stats.success / stats.total) * 60;
+            const failHeight = (stats.failed / stats.total) * 60;
+            html += `
+                <div class="timeline-day">
+                    <div class="timeline-day-label">${date.substring(5)}</div>
+                    <div class="timeline-bars">
+                        <div class="timeline-success" style="height: ${successHeight}px;" title="${stats.success} success"></div>
+                        <div class="timeline-failed" style="height: ${failHeight}px;" title="${stats.failed} failed"></div>
+                    </div>
+                    <div class="timeline-total">${stats.total}</div>
+                </div>
+            `;
+        }
+        html += `</div>`;
+        
+        html += `<div style="max-height: 200px; overflow-y: auto; margin-top: 16px;">`;
+        html += `<table class="healing-table">`;
+        html += `<tr><th>Time</th><th>Service</th><th>Action</th><th>Status</th></tr>`;
+        
+        const allActions = Object.values(data.timeline).flatMap(d => d.actions);
+        const recentActions = allActions.sort((a,b) => b.time.localeCompare(a.time)).slice(0, 10);
+        
+        for (const action of recentActions) {
+            const statusColor = action.status === 'completed' ? 'var(--green)' : 'var(--red)';
+            html += `
+                <tr>
+                    <td style="padding: 6px 0;">${action.time}</td>
+                    <td style="padding: 6px 0;">${action.service.substring(0, 20)}</td>
+                    <td style="padding: 6px 0;">${action.action}</td>
+                    <td style="padding: 6px 0; color: ${statusColor};">${action.status}</td>
+                </tr>
+            `;
+        }
+        html += `</table></div>`;
+        
+        document.getElementById('healing-timeline').innerHTML = html;
+        
+    } catch(e) {
+        document.getElementById('healing-timeline').innerHTML = `<div class="response-box error">Failed to load timeline: ${e.message}</div>`;
+    }
+}
+
+function toggleTheme() {
+    const root = document.documentElement;
+    const isDark = getComputedStyle(root).getPropertyValue('--bg').trim() === '#060910';
+    if (isDark) {
+        root.style.setProperty('--bg', '#f5f7fb');
+        root.style.setProperty('--bg2', '#ffffff');
+        root.style.setProperty('--bg3', '#eef2f6');
+        root.style.setProperty('--border', '#d0d8e8');
+        root.style.setProperty('--border2', '#c0c8d8');
+        root.style.setProperty('--text', '#1a2a3a');
+        root.style.setProperty('--text2', '#4a6a8a');
+        root.style.setProperty('--text3', '#8a9ab0');
+        document.getElementById('themeToggle').textContent = '☀️';
+        localStorage.setItem('neuroops_theme', 'light');
+    } else {
+        root.style.setProperty('--bg', '#060910');
+        root.style.setProperty('--bg2', '#0a0f1a');
+        root.style.setProperty('--bg3', '#0d1520');
+        root.style.setProperty('--border', '#1a2a3a');
+        root.style.setProperty('--border2', '#243548');
+        root.style.setProperty('--text', '#c8d8e8');
+        root.style.setProperty('--text2', '#6a8aaa');
+        root.style.setProperty('--text3', '#3a5a7a');
+        document.getElementById('themeToggle').textContent = '🌙';
+        localStorage.setItem('neuroops_theme', 'dark');
+    }
+}
+function loadTheme() { const saved = localStorage.getItem('neuroops_theme'); if (saved === 'light') toggleTheme(); }
+
+async function apiCall(url, method, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const response = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (response.status === 401) { showLoginModal(); throw new Error('Not authenticated'); }
+    return await response.json();
+}
+async function post(url, body) { return apiCall(url, 'POST', body); }
+async function get(url) { return apiCall(url, 'GET'); }
+
+async function doLogin() {
+    const username = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
+    const formData = new URLSearchParams();
+    formData.append('username', username); formData.append('password', password);
+    try {
+        const response = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData });
+        const data = await response.json();
+        if (response.ok && data.access_token) {
+            authToken = data.access_token;
+            localStorage.setItem('neuroops_token', authToken);
+            document.getElementById('loginModal').style.display = 'none';
+            location.reload();
+        } else { document.getElementById('loginError').textContent = data.detail || 'Invalid credentials'; }
+    } catch(err) { document.getElementById('loginError').textContent = 'Login failed. Is server running?'; }
+}
+function showLoginModal() { document.getElementById('loginModal').style.display = 'flex'; }
+function logout() { localStorage.removeItem('neuroops_token'); authToken = null; showLoginModal(); }
+async function checkAuth() {
+    if (!authToken) { showLoginModal(); return false; }
+    try { await get(`${API}/auth/me`); return true; } catch(e) { showLoginModal(); return false; }
+}
+
+async function checkAWSStatus() { try { const res = await fetch(`${API}/aws/status`); const data = await res.json(); document.getElementById("aws-status-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-status-result").textContent = `Error: ${e.message}`; } }
+async function fetchAWSMetrics() { const token = localStorage.getItem("neuroops_token"); const instance_id = document.getElementById("aws-instance-id").value; const minutes = parseInt(document.getElementById("aws-minutes").value); try { const res = await fetch(`${API}/aws/fetch-metrics`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ instance_id, minutes }) }); const data = await res.json(); document.getElementById("aws-metrics-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-metrics-result").textContent = `Error: ${e.message}`; } }
+async function listEC2Instances() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/instances`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-instances-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-instances-result").textContent = `Error: ${e.message}`; } }
+async function uploadModel() { const token = localStorage.getItem("neuroops_token"); const local_path = document.getElementById("aws-local-path").value; const s3_key = document.getElementById("aws-s3-key").value; try { const res = await fetch(`${API}/aws/upload-model`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ local_path, s3_key }) }); const data = await res.json(); document.getElementById("aws-upload-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-upload-result").textContent = `Error: ${e.message}`; } }
+async function listS3Models() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/list-models`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-s3-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-s3-result").textContent = `Error: ${e.message}`; } }
+async function sendSNSAlert() { const token = localStorage.getItem("neuroops_token"); const subject = document.getElementById("aws-sns-subject").value; const message = document.getElementById("aws-sns-message").value; try { const res = await fetch(`${API}/aws/notify`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ subject, message }) }); const data = await res.json(); document.getElementById("aws-sns-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-sns-result").textContent = `Error: ${e.message}`; } }
+
+async function runInfraMind() { setLoading("inf-result"); try { const data = await post(`${API}/inframind/predict`, { metric: "ec2_cpu", value: parseFloat(document.getElementById("metric-value").value), rolling_mean: parseFloat(document.getElementById("rolling-mean").value), rolling_std: parseFloat(document.getElementById("rolling-std").value), value_diff: parseFloat(document.getElementById("value-diff").value) }); setBox("inf-result", data, data.is_anomaly ? "error" : ""); pushChart(infChart, data.anomaly_score, data.is_anomaly); addAlert({ severity: data.severity, message: `inframind — score ${data.anomaly_score}` }); showToast(`Anomaly score: ${data.anomaly_score}`, data.severity, `📊 ${data.severity.toUpperCase()}`); } catch(e) { setBox("inf-result", e.message, "error"); } }
+async function runDrift() { setLoading("drift-result"); try { const data = await get(`${API}/inframind/drift`); setBox("drift-result", data, data.drift_detected ? "error" : ""); } catch(e) { setBox("drift-result", e.message, "error"); } }
+async function runOpsGPT() { setLoading("ops-result", "ai analyzing log..."); try { const init = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); setBox("ops-result", `job started: ${init.job_id}\npolling...`, "loading"); pollJob(init.job_id, "ops-result"); } catch(e) { setBox("ops-result", e.message, "error"); } }
+async function pollJob(jobId, boxId, interval = 2000) { const timer = setInterval(async () => { try { const data = await get(`${API}/opsgpt/result/${jobId}`); if (data.status === "completed") { clearInterval(timer); setBox(boxId, data.result); } else if (data.status === "failed") { clearInterval(timer); setBox(boxId, data, "error"); } } catch(e) { clearInterval(timer); setBox(boxId, e.message, "error"); } }, interval); }
+async function runClusters() { setLoading("cluster-result"); try { const n = parseInt(document.getElementById("n-clusters").value); const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n }); const summary = data.clusters.map(c => `cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  keywords: ${c.top_keywords.join(", ")}`).join("\n\n"); setBox("cluster-result", `total logs: ${data.total_logs_analyzed} | clusters: ${data.n_clusters}\n\n${summary}`); } catch(e) { setBox("cluster-result", e.message, "error"); } }
+
+function getSensorPayload(unitId) { 
+    return { 
+        unit_id: unitId, 
+        sensor1: parseFloat(document.getElementById("sensor1").value), 
+        sensor2: parseFloat(document.getElementById("sensor2").value), 
+        sensor3: parseFloat(document.getElementById("sensor3").value), 
+        sensor4: parseFloat(document.getElementById("sensor4").value), 
+        sensor5: 14.62, sensor6: 21.61, sensor7: 553.69, sensor8: 2388.09,
+        sensor9: 9050.17, sensor10: 1.3, sensor11: 47.28, sensor12: 521.72,
+        sensor13: 2388.09, sensor14: 8138.62, sensor15: 8.42, sensor16: 0.03,
+        sensor17: 392.0, sensor18: 2388.0, sensor19: 100.0, sensor20: 38.86,
+        sensor21: 23.36, sensor22: 0.0, sensor23: 0.0, sensor24: 0.0 
+    }; 
+}
+
+async function runFailure() { setLoading("fail-result"); try { const data = await post(`${API}/failure/predict`, getSensorPayload(document.getElementById("unit-id").value)); setBox("fail-result", data, data.will_fail_soon ? "error" : ""); showToast(`Failure probability: ${data.failure_prob}`, data.risk_level.toLowerCase(), `⚠️ FAILURE PREDICTION`); } catch(e) { setBox("fail-result", e.message, "error"); } }
+async function runCountdown() { setLoading("countdown-result"); try { const data = await post(`${API}/failure/countdown`, getSensorPayload("engine_007")); setBox("countdown-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("countdown-result", e.message, "error"); } }
+async function runABTest() { setLoading("ab-result"); try { const data = await post(`${API}/failure/ab-test`, getSensorPayload("engine_007")); setBox("ab-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("ab-result", e.message, "error"); } }
+async function runCorrelate() { setLoading("correlate-result"); try { const servicesList = [{ service_name: "engine_api", sensors: [] }, { service_name: "payment_service", sensors: [] }, { service_name: "auth_service", sensors: [] }, { service_name: "cache_layer", sensors: [] }]; const data = await post(`${API}/failure/correlate`, { services: servicesList }); setBox("correlate-result", data, data.is_correlated_failure ? "error" : ""); } catch(e) { setBox("correlate-result", e.message, "error"); } }
+async function runScaleWise() { setLoading("sw-result"); try { const data = await post(`${API}/scalewise/analyze`, { instance_type: document.getElementById("instance-type").value, cpu_usage: parseFloat(document.getElementById("cpu-usage").value), ram_usage: parseFloat(document.getElementById("ram-usage").value), hours_running: 730 }); setBox("sw-result", data); } catch(e) { setBox("sw-result", e.message, "error"); } }
+async function runPricing() { setLoading("pricing-result"); try { const data = await get(`${API}/scalewise/pricing`); setBox("pricing-result", data); } catch(e) { setBox("pricing-result", e.message, "error"); } }
+async function runAutoHealing() { setLoading("ah-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("heal-service").value, severity: document.getElementById("heal-severity").value, metric_value: parseFloat(document.getElementById("heal-metric").value), reason: "triggered from dashboard" }); setBox("ah-result", data); showToast(`${data.action} triggered for ${data.service}`, data.severity, `🛠️ AUTO-HEALING`); } catch(e) { setBox("ah-result", e.message, "error"); } }
+async function loadHealingRules() { setLoading("rules-result"); try { const data = await get(`${API}/autohealing/rules`); setBox("rules-result", data); } catch(e) { setBox("rules-result", e.message, "error"); } }
+async function runPipeline() { setLoading("pipeline-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("pipe-service").value, metric_value: parseFloat(document.getElementById("pipe-metric").value), severity: document.getElementById("pipe-severity").value, log: "dashboard triggered pipeline" }); setBox("pipeline-result", data); } catch(e) { setBox("pipeline-result", e.message, "error"); } }
+async function runBuild() { setLoading("build-result"); try { const data = await post(`${API}/buildsense/trigger`, { service: document.getElementById("build-service").value, branch: document.getElementById("build-branch").value }); setBox("build-result", data, data.status === "failed" ? "error" : ""); } catch(e) { setBox("build-result", e.message, "error"); } }
+async function runDeployGuard() { setLoading("dg-result"); try { const data = await post(`${API}/deployguard/predict`, { service: document.getElementById("deploy-service").value, version: document.getElementById("deploy-version").value, cpu_usage: parseFloat(document.getElementById("deploy-cpu").value), memory_usage: parseFloat(document.getElementById("deploy-mem").value), error_rate: parseFloat(document.getElementById("deploy-errors").value), recent_failures: parseInt(document.getElementById("deploy-failures").value), deployment_size_mb: parseFloat(document.getElementById("deploy-size").value) }); setBox("dg-result", data, data.decision === "blocked" ? "error" : ""); } catch(e) { setBox("dg-result", e.message, "error"); } }
+async function loadFeatures() { setLoading("features-result"); try { const data = await get(`${API}/features/list`); setBox("features-result", data); } catch(e) { setBox("features-result", e.message, "error"); } }
+async function loadRegistry() { setLoading("registry-result"); try { const data = await get(`${API}/registry/list`); setBox("registry-result", data); } catch(e) { setBox("registry-result", e.message, "error"); } }
+async function runDataPipeline() { setLoading("datapipeline-result"); try { const init = await post(`${API}/pipeline/run`, {}); setBox("datapipeline-result", `job: ${init.job_id}\npolling...`, "loading"); const timer = setInterval(async () => { const result = await get(`${API}/pipeline/result/${init.job_id}`); if (result.status === "completed") { clearInterval(timer); setBox("datapipeline-result", result.result); } }, 2000); } catch(e) { setBox("datapipeline-result", e.message, "error"); } }
+
 function switchTab(name) {
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.getElementById("tab-" + name).classList.add("active");
     document.querySelector(`[data-tab="${name}"]`).classList.add("active");
 }
+setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleTimeString(); }, 1000);
 
-// ── CLOCK ───────────────────────────────────────
-setInterval(() => {
-    document.getElementById("clock").textContent = new Date().toLocaleTimeString();
-}, 1000);
-
-// ── CHARTS ──────────────────────────────────────
 function makeLineChart(id, label, color) {
     const ctx = document.getElementById(id).getContext("2d");
-    return new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: [],
-            datasets: [{
-                label,
-                data: [],
-                borderColor: color,
-                backgroundColor: color + "18",
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: [],
-                pointRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: "#6a8aaa", font: { family: "JetBrains Mono", size: 11 } } } },
-            scales: {
-                x: { ticks: { color: "#3a5a7a", font: { family: "JetBrains Mono", size: 10 } }, grid: { color: "#0d1520" } },
-                y: { ticks: { color: "#3a5a7a", font: { family: "JetBrains Mono", size: 10 } }, grid: { color: "#1a2a3a" } }
-            }
-        }
-    });
+    return new Chart(ctx, { type: "line", data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color + "18", tension: 0.4, fill: true, pointBackgroundColor: [] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: "#6a8aaa", font: { size: 11 } } } }, scales: { x: { ticks: { color: "#3a5a7a" }, grid: { color: "#0d1520" } }, y: { ticks: { color: "#3a5a7a" }, grid: { color: "#1a2a3a" } } } } });
+}
+const anomalyChart = makeLineChart("anomalyChart", "anomaly score", "#00d4ff");
+const infChart = makeLineChart("infChart", "score", "#7c3aed");
+
+function pushChart(chart, value, isAnomaly) { 
+    chart.data.labels.push(new Date().toLocaleTimeString()); 
+    chart.data.datasets[0].data.push(value); 
+    chart.data.datasets[0].pointBackgroundColor.push(isAnomaly ? "#ff4455" : "#00ff88"); 
+    if (chart.data.labels.length > 20) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); chart.data.datasets[0].pointBackgroundColor.shift(); } 
+    chart.update(); 
 }
 
-const anomalyChart = makeLineChart("anomalyChart", "Anomaly Score", "#00d4ff");
-const infChart     = makeLineChart("infChart",     "Score",         "#7c3aed");
+async function loadHistoricalScores() {
+    try { const response = await get(`${API}/inframind/history`); if (response.scores && response.scores.length > 0) { infChart.data.labels = []; infChart.data.datasets[0].data = []; infChart.data.datasets[0].pointBackgroundColor = []; response.scores.forEach(score => pushChart(infChart, score.value, score.is_anomaly)); } else { for (let i = 0; i < 15; i++) { const val = 0.1 + Math.random() * 0.7; const isAnomaly = Math.random() < 0.15; pushChart(infChart, val, isAnomaly); } } } catch(e) { for (let i = 0; i < 15; i++) { const val = 0.1 + Math.random() * 0.7; const isAnomaly = Math.random() < 0.15; pushChart(infChart, val, isAnomaly); } } }
 
-function pushChart(chart, value, isAnomaly) {
-    const time = new Date().toLocaleTimeString();
-    chart.data.labels.push(time);
-    chart.data.datasets[0].data.push(value);
-    chart.data.datasets[0].pointBackgroundColor.push(isAnomaly ? "#ff4455" : "#00ff88");
-    if (chart.data.labels.length > 20) {
-        chart.data.labels.shift();
-        chart.data.datasets[0].data.shift();
-        chart.data.datasets[0].pointBackgroundColor.shift();
-    }
-    chart.update();
-}
+function setBox(id, content, type = "") { const box = document.getElementById(id); box.className = `response-box ${type}`; box.textContent = typeof content === "string" ? content : JSON.stringify(content, null, 2); }
+function setLoading(id, msg = "processing...") { setBox(id, msg, "loading"); }
 
-// ── WEBSOCKET ───────────────────────────────────
 let ws = null;
 
+function updateHealthStat(severity) { 
+    const el = document.getElementById("stat-health"); 
+    if (!el) return;
+    if (severity === "critical") { 
+        el.textContent = "critical"; 
+        el.className = "stat-value red"; 
+    } else if (severity === "warning") { 
+        el.textContent = "warning"; 
+        el.className = "stat-value yellow"; 
+    } else { 
+        el.textContent = "healthy"; 
+        el.className = "stat-value green"; 
+    } 
+}
+
+function updateServiceGrid(services) { 
+    const grid = document.getElementById("service-grid");
+    if (!grid) return;
+    
+    if (!services || services.length === 0) {
+        grid.innerHTML = '<div class="response-box">No active services</div>';
+        return;
+    }
+    
+    grid.innerHTML = services.map(s => {
+        const cpuDisplay = s.cpu !== undefined ? `${s.cpu}%` : 'N/A';
+        const memoryDisplay = s.memory !== undefined ? `${s.memory}%` : 'N/A';
+        const diskDisplay = s.disk !== undefined ? `${s.disk}%` : 'N/A';
+        
+        return `
+            <div class="alert-item ${s.severity || 'normal'}">
+                <div class="alert-dot ${s.severity || 'normal'}"></div>
+                <div style="flex:1">
+                    <span style="font-size:13px;font-weight:600">${s.service}</span>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);margin-top:4px">
+                        🖥️ CPU: ${cpuDisplay} | 💾 Memory: ${memoryDisplay} | 💿 Disk: ${diskDisplay}
+                        ${s.failure_probability > 0 ? ` | ⚠️ Failure: ${s.failure_probability}%` : ''}
+                        ${s.rul_cycles > 0 ? ` | 🔄 RUL: ${s.rul_cycles} cycles` : ''}
+                    </div>
+                </div>
+                <span class="tag ${s.severity || 'normal'}">${(s.severity || 'normal').toUpperCase()}</span>
+            </div>
+        `;
+    }).join(""); 
+}
+
 function connectWS() {
-    ws = new WebSocket(WS);
-    ws.onopen = () => {
-        document.getElementById("live-badge").textContent = "● LIVE";
+    if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+        return;
+    }
+    
+    window.ws = new WebSocket(WS);
+    
+    window.ws.onopen = () => { 
+        document.getElementById("live-badge").textContent = "● live"; 
         document.getElementById("live-badge").style.color = "#00ff88";
     };
-    ws.onmessage = (e) => {
+    
+    window.ws.onmessage = (e) => {
+    try {
         const data = JSON.parse(e.data);
         if (data.type === "metric_stream") {
             const s = data.summary;
-            document.getElementById("stat-anomalies").textContent = s.anomalies;
+            const anomaliesEl = document.getElementById("stat-anomalies");
+            if (anomaliesEl) anomaliesEl.textContent = s.anomalies;
             updateHealthStat(s.critical > 0 ? "critical" : s.anomalies > 0 ? "warning" : "normal");
-            const first = data.services[0];
-            pushChart(anomalyChart, first.anomaly_score, first.is_anomaly);
-            updateServiceGrid(data.services);
-            data.services.filter(sv => sv.is_anomaly).forEach(sv =>
-                addAlert({ severity: sv.severity, message: `${sv.service} — CPU ${sv.value}%` })
-            );
+            
+            if (data.services && data.services.length > 0) {
+                pushChart(anomalyChart, data.services[0].anomaly_score || 0.1, data.services[0].is_anomaly || false);
+                
+                const formattedServices = data.services.map(svc => ({
+                    service: svc.service,
+                    severity: svc.severity || "normal",
+                    cpu: svc.cpu !== undefined ? svc.cpu : (svc.value !== undefined ? svc.value : 0),
+                    memory: svc.memory !== undefined ? svc.memory : 0,
+                    disk: svc.disk !== undefined ? svc.disk : 0,
+                    failure_probability: svc.failure_probability || 0,
+                    rul_cycles: svc.rul_cycles || 0,
+                    is_anomaly: svc.is_anomaly || false,
+                    anomaly_score: svc.anomaly_score || 0
+                }));
+                updateServiceGrid(formattedServices);
+                
+                data.services.filter(sv => sv.is_anomaly).forEach(sv => {
+                    const cpuVal = sv.cpu !== undefined ? sv.cpu : sv.value;
+                    addAlert({ severity: sv.severity, message: `${sv.service} — CPU ${cpuVal}%` });
+                    showToast(`${sv.service} CPU at ${cpuVal}%`, sv.severity, `🚨 ANOMALY DETECTED`);
+                });
+            }
+            
+            if (s.critical > 0) {
+                showToast(`${s.critical} critical anomalies detected`, 'critical', '⚠️ MULTIPLE ANOMALIES');
+            }
         }
+    } catch(err) {
+        console.log('WebSocket message error:', err);
+    }
+};
+    
+    window.ws.onclose = () => { 
+        document.getElementById("live-badge").textContent = "● reconnecting"; 
+        document.getElementById("live-badge").style.color = "#ffaa00"; 
+        setTimeout(connectWS, 3000); 
     };
-    ws.onclose = () => {
-        document.getElementById("live-badge").textContent = "● RECONNECTING";
-        document.getElementById("live-badge").style.color = "#ffaa00";
-        setTimeout(connectWS, 3000);
+    
+    window.ws.onerror = (err) => {
+        console.log('WebSocket error:', err);
     };
 }
 
-function updateServiceGrid(services) {
-    const g = document.getElementById("service-grid");
-    g.innerHTML = services.map(s => `
-        <div class="alert-item ${s.severity}">
-            <div class="alert-dot ${s.severity}"></div>
-            <div style="flex:1">
-                <span style="font-size:13px;font-weight:600">${s.service}</span>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);margin-left:8px">CPU ${s.value}%</span>
+async function loadRealMetrics() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const instancesData = await instancesRes.json();
+        if (instancesData.instances && instancesData.instances.length > 0) {
+            const instance = instancesData.instances[0];
+            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const metrics = await metricsRes.json();
+            if (metrics.cpu_percent) {
+                pushChart(anomalyChart, metrics.cpu_percent, metrics.cpu_percent > 80);
+                let ec2Element = document.getElementById('ec2-cpu-display');
+                if (!ec2Element) {
+                    const serviceGrid = document.getElementById('service-grid');
+                    if (serviceGrid) {
+                        const newDiv = document.createElement('div');
+                        newDiv.className = 'alert-item normal';
+                        newDiv.id = 'ec2-cpu-container';
+                        newDiv.innerHTML = `<div class="alert-dot normal"></div><div style="flex:1"><span style="font-size:13px;font-weight:600">EC2 ${instance.instance_id.substring(0,10)}...</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);margin-left:8px">CPU <span id="ec2-cpu-display">${metrics.cpu_percent}%</span></span></div><span class="tag normal">AWS LIVE</span>`;
+                        serviceGrid.insertBefore(newDiv, serviceGrid.firstChild);
+                    }
+                } else { ec2Element.textContent = `${metrics.cpu_percent}%`; }
+                if (metrics.cpu_percent > 80) {
+                    addAlert({ severity: "critical", message: `EC2 CPU spike: ${metrics.cpu_percent}%` });
+                    showToast(`EC2 CPU spike: ${metrics.cpu_percent}%`, 'critical', '⚠️ CRITICAL');
+                } else if (metrics.cpu_percent > 60) {
+                    addAlert({ severity: "warning", message: `EC2 CPU elevated: ${metrics.cpu_percent}%` });
+                }
+            }
+        }
+    } catch(e) { console.log("Real metrics not ready yet:", e); }
+}
+
+async function updateModelHealth() {
+    try {
+        const drift = await get(`${API}/inframind/drift`);
+        const driftAmount = drift.drift_amount || '0%';
+        const driftDetected = drift.drift_detected || false;
+        document.getElementById('model-drift').textContent = driftAmount;
+        document.getElementById('model-drift').className = driftDetected ? 'tag warning' : 'tag normal';
+    } catch(e) { console.log('Model health fetch failed'); }
+}
+
+async function autoPopulateInputs() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const instancesRes = await fetch(`${API}/aws/instances`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const instancesData = await instancesRes.json();
+        
+        if (instancesData.instances && instancesData.instances.length > 0) {
+            const instance = instancesData.instances[0];
+            const instanceId = instance.instance_id;
+            
+            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instanceId}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const metrics = await metricsRes.json();
+            
+            if (metrics && metrics.cpu_percent !== null) {
+                const cpuValue = parseFloat(metrics.cpu_percent).toFixed(1);
+                
+                const metricValueInput = document.getElementById('metric-value');
+                if (metricValueInput) metricValueInput.value = cpuValue;
+                
+                const failureCpuInput = document.getElementById('sensor1');
+                if (failureCpuInput) failureCpuInput.value = cpuValue;
+                
+                const unitIdInput = document.getElementById('unit-id');
+                if (unitIdInput) unitIdInput.value = instanceId;
+                
+                console.log(`Auto-populated CPU: ${cpuValue}%`);
+            }
+        }
+    } catch(e) {
+        console.log('Auto-populate failed:', e);
+    }
+}
+
+async function loadLatestFailurePrediction() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const instancesRes = await fetch(`${API}/aws/instances`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const instancesData = await instancesRes.json();
+        
+        if (instancesData.instances && instancesData.instances.length > 0) {
+            const instance = instancesData.instances[0];
+            const predRes = await fetch(`${API}/failure/latest/${instance.instance_id}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const prediction = await predRes.json();
+            
+            if (prediction && prediction.failure_probability !== undefined) {
+                const failResultBox = document.getElementById('fail-result');
+                if (failResultBox && failResultBox.classList.contains('loading')) {
+                    const resultHtml = `
+                        🚨 AUTO PREDICTION (updated every 60s)
+                        Will fail soon: ${prediction.will_fail_soon ? '⚠️ YES' : '✅ NO'}
+                        Failure Probability: ${prediction.failure_probability}%
+                        Risk Level: ${prediction.risk_level}
+                        Action: ${prediction.action}
+                        ${prediction.reason ? `Reason: ${prediction.reason}` : ''}
+                        Last updated: ${new Date(prediction.timestamp).toLocaleTimeString()}
+                    `;
+                    setBox("fail-result", resultHtml, prediction.risk_level === "CRITICAL" ? "error" : "");
+                }
+            }
+        }
+    } catch(e) {
+        console.log('Failed to load failure prediction:', e);
+    }
+}
+
+async function autoPopulateFailure() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const instancesRes = await fetch(`${API}/aws/instances`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const instancesData = await instancesRes.json();
+        
+        if (instancesData.instances && instancesData.instances.length > 0) {
+            const instance = instancesData.instances[0];
+            const instanceId = instance.instance_id;
+            
+            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instanceId}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const metrics = await metricsRes.json();
+            
+            const statusRes = await fetch(`${API}/aws/instance-status/${instanceId}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const statusData = await statusRes.json();
+            
+            const rebootRes = await fetch(`${API}/aws/reboot-count/${instanceId}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const rebootData = await rebootRes.json();
+            
+            const unitIdInput = document.getElementById('unit-id');
+            if (unitIdInput) unitIdInput.value = instanceId;
+            
+            const cpuInput = document.getElementById('sensor1');
+            if (cpuInput && metrics.cpu_percent !== undefined) {
+                cpuInput.value = parseFloat(metrics.cpu_percent).toFixed(1);
+            }
+            
+            const statusSelect = document.getElementById('sensor2');
+            if (statusSelect && statusData.is_healthy !== undefined) {
+                statusSelect.value = statusData.is_healthy ? '1' : '0';
+            }
+            
+            const rebootInput = document.getElementById('sensor3');
+            if (rebootInput && rebootData.count !== undefined) {
+                rebootInput.value = rebootData.count;
+            }
+            
+            const ageInput = document.getElementById('sensor4');
+            if (ageInput && instance.launch_time) {
+                const launchDate = new Date(instance.launch_time);
+                const now = new Date();
+                const ageDays = Math.floor((now - launchDate) / (1000 * 60 * 60 * 24));
+                ageInput.value = ageDays;
+            }
+            
+            console.log('Failure tab auto-populated');
+        }
+    } catch(e) {
+        console.log('Auto-populate failure failed:', e);
+    }
+}
+
+async function loadLatestRULPrediction() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const instancesRes = await fetch(`${API}/aws/instances`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const instancesData = await instancesRes.json();
+        
+        if (instancesData.instances && instancesData.instances.length > 0) {
+            const instance = instancesData.instances[0];
+            const predRes = await fetch(`${API}/failure/rul-latest/${instance.instance_id}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const prediction = await predRes.json();
+            
+            if (prediction && prediction.cycles_remaining !== undefined) {
+                const rulBox = document.getElementById('countdown-result');
+                if (rulBox && rulBox.classList.contains('loading')) {
+                    const resultHtml = `
+                        🤖 AUTO RUL PREDICTION (updated every 60s)
+                        Cycles Remaining: ${prediction.cycles_remaining}
+                        Hours Remaining: ${prediction.hours_remaining}
+                        Urgency: ${prediction.urgency}
+                        Confidence: ${prediction.confidence_pct}% (${prediction.lower_bound} - ${prediction.upper_bound} cycles)
+                        Recommendation: ${prediction.recommendation}
+                        Last updated: ${new Date(prediction.timestamp).toLocaleTimeString()}
+                    `;
+                    setBox("countdown-result", resultHtml, prediction.urgency === "CRITICAL" ? "error" : "");
+                }
+            }
+        }
+    } catch(e) {
+        console.log('Failed to load RUL prediction:', e);
+    }
+}
+
+async function loadServiceDropdowns() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const response = await fetch(`${API}/autohealing/services`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.services && data.services.length > 0) {
+            const serviceSelectHtml = data.services.map(s => `<option value="${s}">${s}</option>`).join('');
+            
+            const healServiceInput = document.getElementById('heal-service');
+            if (healServiceInput && healServiceInput.tagName === 'INPUT') {
+                const parent = healServiceInput.parentNode;
+                const select = document.createElement('select');
+                select.id = 'heal-service';
+                select.className = healServiceInput.className;
+                select.innerHTML = serviceSelectHtml;
+                parent.replaceChild(select, healServiceInput);
+            }
+            
+            const pipeServiceInput = document.getElementById('pipe-service');
+            if (pipeServiceInput && pipeServiceInput.tagName === 'INPUT') {
+                const parent = pipeServiceInput.parentNode;
+                const select = document.createElement('select');
+                select.id = 'pipe-service';
+                select.className = pipeServiceInput.className;
+                select.innerHTML = serviceSelectHtml;
+                parent.replaceChild(select, pipeServiceInput);
+            }
+            
+            const buildServiceInput = document.getElementById('build-service');
+            if (buildServiceInput && buildServiceInput.tagName === 'INPUT') {
+                const parent = buildServiceInput.parentNode;
+                const select = document.createElement('select');
+                select.id = 'build-service';
+                select.className = buildServiceInput.className;
+                select.innerHTML = serviceSelectHtml;
+                parent.replaceChild(select, buildServiceInput);
+            }
+            
+            const deployServiceInput = document.getElementById('deploy-service');
+            if (deployServiceInput && deployServiceInput.tagName === 'INPUT') {
+                const parent = deployServiceInput.parentNode;
+                const select = document.createElement('select');
+                select.id = 'deploy-service';
+                select.className = deployServiceInput.className;
+                select.innerHTML = serviceSelectHtml;
+                parent.replaceChild(select, deployServiceInput);
+            }
+            
+            console.log(`Loaded ${data.services.length} services for dropdowns from ${data.source}`);
+        }
+    } catch(e) {
+        console.log('Failed to load service dropdowns:', e);
+    }
+}
+
+let notifications = [];
+
+async function fetchIncidents() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        const res = await fetch(`${API}/incidents/recent?limit=20`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        if (data.incidents) { 
+            notifications = data.incidents.map(n => ({ ...n, read: n.read || false }));
+            updateNotificationBell(); 
+        }
+    } catch(e) { console.log('Failed to fetch incidents:', e); }
+}
+
+async function loadCapacityPlan() {
+    setLoading("capacity-result");
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        const instancesRes = await fetch(`${API}/aws/instances`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const instancesData = await instancesRes.json();
+        
+        if (instancesData.instances && instancesData.instances.length > 0) {
+            const instance = instancesData.instances[0];
+            const res = await fetch(`${API}/scalewise/capacity/${instance.instance_id}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const data = await res.json();
+            
+            let html = `📊 CAPACITY PLAN\n`;
+            html += `Instance: ${data.instance_id}\n`;
+            html += `\nCPU: ${data.cpu.current_avg}% avg, growth ${data.cpu.growth_rate_per_day}%/day\n`;
+            if (data.cpu.days_until_80_percent) {
+                html += `⚠️ CPU will reach 80% in ${data.cpu.days_until_80_percent} days\n`;
+            }
+            html += `\nMemory: ${data.memory.current}%, growth ${data.memory.growth_rate_per_day}%/day\n`;
+            if (data.memory.days_until_90_percent) {
+                html += `⚠️ Memory will reach 90% in ${data.memory.days_until_90_percent} days\n`;
+            }
+            html += `\n💡 Recommendation: ${data.instance_need.recommendation}`;
+            
+            setBox("capacity-result", html);
+        }
+    } catch(e) {
+        setBox("capacity-result", e.message, "error");
+    }
+}
+
+async function loadCostSavings() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        const response = await fetch(`${API}/scalewise/savings`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        const savingsEl = document.getElementById('savings-amount');
+        const recEl = document.getElementById('savings-recommendation');
+        
+        if (savingsEl) {
+            savingsEl.textContent = `$${data.savings}`;
+        }
+        if (recEl) {
+            recEl.textContent = data.recommendation || 'saved this month via ScaleWise';
+        }
+    } catch(e) {
+        console.log('Failed to load savings:', e);
+    }
+}
+
+function toggleExpand(incidentId) {
+    const fullTextDiv = document.getElementById(`full-text-${incidentId}`);
+    if (fullTextDiv) {
+        fullTextDiv.classList.toggle('show');
+    }
+}
+
+function updateNotificationBell() {
+    const badge = document.getElementById('bellBadge');
+    const list = document.getElementById('notificationList');
+    const unread = notifications.filter(n => !n.read).length;
+    if (unread > 0) { badge.textContent = unread > 99 ? '99+' : unread; badge.style.display = 'block'; } 
+    else { badge.style.display = 'none'; }
+    
+    if (notifications.length === 0) { 
+        list.innerHTML = '<div class="notification-empty">No recent incidents</div>'; 
+        return; 
+    }
+    
+    list.innerHTML = notifications.map(n => {
+        const autoHealed = n.resolution ? true : false;
+        const notifiedOnCall = n.notified || false;
+        const shortRootCause = n.root_cause ? n.root_cause.substring(0, 100) : 'No root cause analysis available';
+        const fullRootCause = n.root_cause || 'No root cause analysis available';
+        
+        return `
+            <div class="notification-item ${n.read ? '' : 'unread'}" onclick="markIncidentRead(${n.id})">
+                <div class="notification-title">${n.title || 'Incident'}</div>
+                <div class="notification-meta">
+                    <span class="notification-severity ${n.severity}">${n.severity?.toUpperCase() || 'INFO'}</span>
+                    <span>${new Date(n.detected_at).toLocaleString()}</span>
+                </div>
+                <div class="notification-preview">${shortRootCause}...</div>
+                <div class="expand-btn" onclick="event.stopPropagation(); toggleExpand(${n.id})">▼ Expand</div>
+                <div id="full-text-${n.id}" class="notification-full-text">
+                    <strong>Full Root Cause:</strong><br>${fullRootCause}
+                </div>
+                <div class="notification-action-status">
+                    <span>🛠️ Auto-Healing: <span class="${autoHealed ? 'action-taken' : 'action-not-taken'}">${autoHealed ? 'Executed' : 'Not Executed'}</span></span>
+                    <span>📢 On-Call Notified: <span class="${notifiedOnCall ? 'action-taken' : 'action-not-taken'}">${notifiedOnCall ? 'Yes' : 'No'}</span></span>
+                </div>
             </div>
-            <span class="tag ${s.severity}">${s.severity.toUpperCase()}</span>
-        </div>
-    `).join("");
+        `;
+    }).join('');
 }
 
-function updateHealthStat(severity) {
-    const el = document.getElementById("stat-health");
-    if (severity === "critical") { el.textContent = "CRITICAL"; el.className = "stat-value red"; }
-    else if (severity === "warning") { el.textContent = "WARNING"; el.className = "stat-value yellow"; }
-    else { el.textContent = "HEALTHY"; el.className = "stat-value green"; }
+function markIncidentRead(incidentId) {
+    const incident = notifications.find(n => n.id === incidentId);
+    if (incident) { incident.read = true; updateNotificationBell(); }
 }
 
-// ── ALERTS ──────────────────────────────────────
-function addAlert(data) {
-    const feed = document.getElementById("alert-feed");
-    if (feed.querySelector(".loading")) feed.innerHTML = "";
-    const sev  = data.severity || "normal";
-    const item = document.createElement("div");
-    item.className = `alert-item ${sev}`;
-    item.innerHTML = `
-        <div class="alert-dot ${sev}"></div>
-        <div style="flex:1;font-size:13px">${data.message || "Metric analyzed"}</div>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${new Date().toLocaleTimeString()}</span>
-        <span class="tag ${sev}" style="margin-left:8px">${sev.toUpperCase()}</span>
-    `;
-    feed.insertBefore(item, feed.firstChild);
-    if (feed.children.length > 20) feed.removeChild(feed.lastChild);
+function addAlert(data) { 
+    const feed = document.getElementById("alert-feed"); 
+    if (feed.querySelector(".loading")) feed.innerHTML = ""; 
+    const sev = data.severity || "normal"; 
+    const item = document.createElement("div"); 
+    item.className = `alert-item ${sev}`; 
+    item.innerHTML = `<div class="alert-dot ${sev}"></div><div style="flex:1;font-size:13px">${data.message || "metric analyzed"}</div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${new Date().toLocaleTimeString()}</span><span class="tag ${sev}" style="margin-left:8px">${sev.toUpperCase()}</span>`; 
+    feed.insertBefore(item, feed.firstChild); 
+    if (feed.children.length > 20) feed.removeChild(feed.lastChild); 
 }
 
-function loadAlerts() {
-    const feed = document.getElementById("alert-feed");
-    feed.innerHTML = "";
-    [{severity:"critical", message:"ec2_cpu spike detected"},
-     {severity:"warning",  message:"Memory above threshold"},
-     {severity:"normal",   message:"Health check passed"}
-    ].forEach(a => addAlert(a));
+function loadAlerts() { 
+    const feed = document.getElementById("alert-feed"); 
+    feed.innerHTML = ""; 
+    [{severity:"critical", message:"ec2_cpu spike detected"},{severity:"warning",message:"memory above threshold"},{severity:"normal",message:"health check passed"}].forEach(a => addAlert(a)); 
 }
 
-// ── HELPERS ─────────────────────────────────────
-function setBox(id, content, type = "") {
-    const box = document.getElementById(id);
-    box.className = `response-box ${type}`;
-    box.textContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+async function init() {
+    loadTheme();
+    const isAuth = await checkAuth();
+    if (isAuth) {
+        loadAlerts(); 
+        connectWS();
+        loadHistoricalScores(); 
+        fetchIncidents(); 
+        loadRealMetrics();
+        autoPopulateInputs();
+        autoPopulateFailure();
+        loadServiceDropdowns();
+        updateModelHealth();
+        loadHealingTimeline();
+        loadCostSavings();
+        loadLatestRULPrediction();
+        
+        setInterval(fetchIncidents, 30000);
+        setInterval(updateModelHealth, 60000);
+        setInterval(autoPopulateInputs, 20000);
+        setInterval(autoPopulateFailure, 20000);
+        setInterval(loadRealMetrics, 10000);
+        setInterval(loadLatestFailurePrediction, 30000);
+        setInterval(loadLatestRULPrediction, 30000);
+        setInterval(loadCostSavings, 30000);
+        setInterval(loadHealingTimeline, 60000);
+        setInterval(loadServiceDropdowns, 60000);
+    }
 }
 
-function setLoading(id, msg = "Processing...") {
-    setBox(id, msg, "loading");
-}
-
-async function post(url, body) {
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-    });
-    return res.json();
-}
-
-async function get(url) {
-    const res = await fetch(url);
-    return res.json();
-}
-
-// ── INFRAMIND ────────────────────────────────────
-async function runInfraMind() {
-    setLoading("inf-result", "Analyzing...");
-    try {
-        const data = await post(`${API}/inframind/predict`, {
-            metric      : "ec2_cpu",
-            value       : parseFloat(document.getElementById("inf-value").value),
-            rolling_mean: parseFloat(document.getElementById("inf-mean").value),
-            rolling_std : parseFloat(document.getElementById("inf-std").value),
-            value_diff  : parseFloat(document.getElementById("inf-diff").value)
-        });
-        setBox("inf-result", data, data.is_anomaly ? "error" : "");
-        pushChart(infChart, data.anomaly_score, data.is_anomaly);
-        addAlert({ severity: data.severity, message: `InfraMind — score ${data.anomaly_score}` });
-    } catch(e) { setBox("inf-result", e.message, "error"); }
-}
-
-async function runDrift() {
-    setLoading("drift-result");
-    try {
-        const data = await get(`${API}/inframind/drift`);
-        setBox("drift-result", data, data.drift_detected ? "error" : "");
-    } catch(e) { setBox("drift-result", e.message, "error"); }
-}
-
-// ── OPSGPT ───────────────────────────────────────
-async function runOpsGPT() {
-    setLoading("ops-result", "AI analyzing log... (10-20 seconds)");
-    try {
-        const init = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("ops-log").value });
-        setBox("ops-result", `Job started: ${init.job_id}\nPolling for result...`, "loading");
-        pollJob(init.job_id, "ops-result");
-    } catch(e) { setBox("ops-result", e.message, "error"); }
-}
-
-async function pollJob(jobId, boxId, interval = 2000) {
-    const timer = setInterval(async () => {
-        try {
-            const data = await get(`${API}/opsgpt/result/${jobId}`);
-            if (data.status === "completed") {
-                clearInterval(timer);
-                setBox(boxId, data.result);
-            } else if (data.status === "failed") {
-                clearInterval(timer);
-                setBox(boxId, data, "error");
-            }
-        } catch(e) { clearInterval(timer); setBox(boxId, e.message, "error"); }
-    }, interval);
-}
-
-async function runClusters() {
-    setLoading("cluster-result", "Running KMeans clustering...");
-    try {
-        const n    = parseInt(document.getElementById("cluster-n").value);
-        const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n });
-        const summary = data.clusters.map(c =>
-            `Cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  Keywords: ${c.top_keywords.join(", ")}`
-        ).join("\n\n");
-        setBox("cluster-result", `Total logs: ${data.total_logs_analyzed} | Clusters: ${data.n_clusters} | Cache: ${data.from_cache}\n\n${summary}`);
-    } catch(e) { setBox("cluster-result", e.message, "error"); }
-}
-
-// ── FAILURE ──────────────────────────────────────
-function getSensorPayload(unitId) {
-    return {
-        unit_id: unitId,
-        sensor1: parseFloat(document.getElementById("fail-s1").value),
-        sensor2: parseFloat(document.getElementById("fail-s2").value),
-        sensor3: parseFloat(document.getElementById("fail-s3").value),
-        sensor4: 1407.91, sensor5: 14.62,  sensor6: 21.61,
-        sensor7: 553.69,  sensor8: 2388.09, sensor9: 9050.17,
-        sensor10: 1.3,    sensor11: 47.28,  sensor12: 521.72,
-        sensor13: 2388.09,sensor14: 8138.62,sensor15: 8.42,
-        sensor16: 0.03,   sensor17: 392.0,  sensor18: 2388.0,
-        sensor19: 100.0,  sensor20: 38.86,  sensor21: 23.36,
-        sensor22: 0.0,    sensor23: 0.0,    sensor24: 0.0
-    };
-}
-
-async function runFailure() {
-    setLoading("fail-result", "Predicting...");
-    try {
-        const data = await post(`${API}/failure/predict`, getSensorPayload(document.getElementById("fail-unit").value));
-        setBox("fail-result", data, data.will_fail_soon ? "error" : "");
-    } catch(e) { setBox("fail-result", e.message, "error"); }
-}
-
-async function runCountdown() {
-    setLoading("countdown-result", "Calculating RUL...");
-    try {
-        const data = await post(`${API}/failure/countdown`, getSensorPayload("engine_007"));
-        setBox("countdown-result", data, data.urgency === "CRITICAL" ? "error" : "");
-    } catch(e) { setBox("countdown-result", e.message, "error"); }
-}
-
-async function runABTest() {
-    setLoading("ab-result", "Running A/B test...");
-    try {
-        const data = await post(`${API}/failure/ab-test`, getSensorPayload("engine_007"));
-        setBox("ab-result", data, data.urgency === "CRITICAL" ? "error" : "");
-    } catch(e) { setBox("ab-result", e.message, "error"); }
-}
-
-async function runCorrelate() {
-    setLoading("correlate-result", "Correlating services...");
-    try {
-        const sensors = [518.67,642.46,1583.25,1407.91,14.62,21.61,553.69,2388.09,9050.17,1.3,47.28,521.72,2388.09,8138.62,8.42,0.03,392.0,2388.0,100.0,38.86,23.36,0.0,0.0,0.0];
-        const data = await post(`${API}/failure/correlate`, {
-            services: [
-                { service_name: "engine_api",      sensors },
-                { service_name: "payment_service", sensors },
-                { service_name: "auth_service",    sensors },
-                { service_name: "cache_layer",     sensors: [480.0,600.0,1490.0,1300.0,12.0,19.0,510.0,2200.0,8500.0,0.9,43.0,495.0,2200.0,7800.0,7.8,0.02,360.0,2200.0,98.0,35.0,21.0,0.0,0.0,0.0] }
-            ]
-        });
-        setBox("correlate-result", data, data.is_correlated_failure ? "error" : "");
-    } catch(e) { setBox("correlate-result", e.message, "error"); }
-}
-
-// ── SCALEWISE ─────────────────────────────────────
-async function runScaleWise() {
-    setLoading("sw-result", "Optimizing...");
-    try {
-        const data = await post(`${API}/scalewise/analyze`, {
-            instance_type: document.getElementById("sw-instance").value,
-            cpu_usage    : parseFloat(document.getElementById("sw-cpu").value),
-            ram_usage    : parseFloat(document.getElementById("sw-ram").value),
-            hours_running: 730
-        });
-        setBox("sw-result", data);
-    } catch(e) { setBox("sw-result", e.message, "error"); }
-}
-
-async function runPricing() {
-    setLoading("pricing-result", "Loading...");
-    try {
-        const data = await get(`${API}/scalewise/pricing`);
-        setBox("pricing-result", data);
-    } catch(e) { setBox("pricing-result", e.message, "error"); }
-}
-
-// ── AUTO-HEALING ──────────────────────────────────
-async function runAutoHealing() {
-    setLoading("ah-result", "Triggering...");
-    try {
-        const data = await post(`${API}/autohealing/trigger`, {
-            service     : document.getElementById("ah-service").value,
-            severity    : document.getElementById("ah-severity").value,
-            metric_value: parseFloat(document.getElementById("ah-metric").value),
-            reason      : "Triggered from dashboard"
-        });
-        setBox("ah-result", data);
-    } catch(e) { setBox("ah-result", e.message, "error"); }
-}
-
-async function loadHealingRules() {
-    setLoading("rules-result", "Loading...");
-    try {
-        const data = await get(`${API}/autohealing/rules`);
-        setBox("rules-result", data);
-    } catch(e) { setBox("rules-result", e.message, "error"); }
-}
-
-async function runPipeline() {
-    setLoading("pipeline-result", "Running full pipeline...");
-    try {
-        const data = await post(`${API}/autohealing/trigger`, {
-            service     : document.getElementById("pipe-service").value,
-            metric_value: parseFloat(document.getElementById("pipe-metric").value),
-            severity    : document.getElementById("pipe-severity").value,
-            log         : "Dashboard triggered pipeline"
-        });
-        setBox("pipeline-result", data);
-    } catch(e) { setBox("pipeline-result", e.message, "error"); }
-}
-
-// ── BUILD/DEPLOY ──────────────────────────────────
-async function runBuild() {
-    setLoading("build-result", "Running build...");
-    try {
-        const data = await post(`${API}/buildsense/trigger`, {
-            service: document.getElementById("build-service").value,
-            branch : document.getElementById("build-branch").value
-        });
-        setBox("build-result", data, data.status === "failed" ? "error" : "");
-    } catch(e) { setBox("build-result", e.message, "error"); }
-}
-
-async function runDeployGuard() {
-    setLoading("dg-result", "Analyzing risk...");
-    try {
-        const data = await post(`${API}/deployguard/predict`, {
-            service            : document.getElementById("dg-service").value,
-            version            : document.getElementById("dg-version").value,
-            cpu_usage          : parseFloat(document.getElementById("dg-cpu").value),
-            memory_usage       : parseFloat(document.getElementById("dg-mem").value),
-            error_rate         : parseFloat(document.getElementById("dg-err").value),
-            recent_failures    : parseInt(document.getElementById("dg-fail").value),
-            deployment_size_mb : parseFloat(document.getElementById("dg-size").value)
-        });
-        setBox("dg-result", data, data.decision === "BLOCKED" ? "error" : "");
-    } catch(e) { setBox("dg-result", e.message, "error"); }
-}
-
-// ── MLOPS ─────────────────────────────────────────
-async function loadFeatures() {
-    setLoading("features-result", "Loading...");
-    try {
-        const data = await get(`${API}/features/list`);
-        setBox("features-result", data);
-    } catch(e) { setBox("features-result", e.message, "error"); }
-}
-
-async function loadRegistry() {
-    setLoading("registry-result", "Loading...");
-    try {
-        const data = await get(`${API}/registry/list`);
-        setBox("registry-result", data);
-    } catch(e) { setBox("registry-result", e.message, "error"); }
-}
-
-async function runDataPipeline() {
-    setLoading("datapipeline-result", "Starting pipeline...");
-    try {
-        const init = await post(`${API}/pipeline/run`, {});
-        setBox("datapipeline-result", `Job: ${init.job_id}\nPolling...`, "loading");
-        const timer = setInterval(async () => {
-            const result = await get(`${API}/pipeline/result/${init.job_id}`);
-            if (result.status === "completed") {
-                clearInterval(timer);
-                setBox("datapipeline-result", result.result);
-            }
-        }, 2000);
-    } catch(e) { setBox("datapipeline-result", e.message, "error"); }
-}
-
-// ── INIT ──────────────────────────────────────────
-loadAlerts();
-connectWS();
+init();
 </script>
 </body>
 </html>
