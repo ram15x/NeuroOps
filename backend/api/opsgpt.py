@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 
 from backend.core.config import settings
-from backend.models.database import get_db, PredictionHistory
+from backend.models.database import get_db, PredictionHistory, AlertCluster, Service
 from backend.services.redis_service import redis_client
 from backend.services.rate_limiter import limiter
 from backend.services.task_manager import create_job, update_job, get_job
@@ -13,6 +13,7 @@ from backend.models.schemas import LogInput, ClusterRequest
 from backend.services.log_clusterer import run_log_clustering
 from backend.services.audit_logger import AuditLogger
 from backend.api.auth import get_current_user
+from backend.services.priority_ranker import calculate_cluster_priority, get_ranked_clusters
 
 router = APIRouter()
 
@@ -76,7 +77,6 @@ def analyze_log(
 
         job_id = create_job("opsgpt_analyze", {"log": log_text[:500]})
         
-        # store prediction history
         prediction_history = PredictionHistory(
             model_name="opsgpt",
             input_features={"log_preview": log_text[:200]},
@@ -87,7 +87,6 @@ def analyze_log(
         db.add(prediction_history)
         db.flush()
         
-        # audit log
         AuditLogger.log(
             db=db,
             user_id=current_user.id,
@@ -137,7 +136,6 @@ def analyze_batch(
             background_tasks.add_task(run_analysis, job_id, log, current_user.id, current_user.username)
             job_ids.append(job_id)
 
-        # audit log for batch
         AuditLogger.log(
             db=db,
             user_id=current_user.id,
@@ -185,10 +183,58 @@ def get_log_clusters(
             result["from_cache"] = True
             return result
 
+        # Run clustering (existing function)
         result = run_log_clustering(n_clusters=data.n_clusters)
+        
+        # NEW for GAP 1: Calculate priority for each cluster and store in DB
+        if result.get("clusters"):
+            for cluster_data in result["clusters"]:
+                # Calculate priority score for this cluster
+                cluster_priority = calculate_cluster_priority(
+                    cluster_data=cluster_data,
+                    db=db
+                )
+                cluster_data["priority_score"] = cluster_priority["priority_score"]
+                cluster_data["priority_rank"] = cluster_priority["priority_rank"]
+                
+                # Store or update AlertCluster in database
+                cluster_id = f"cluster_{cluster_data['cluster_id']}"
+                existing_cluster = db.query(AlertCluster).filter(
+                    AlertCluster.cluster_id == cluster_id
+                ).first()
+                
+                if existing_cluster:
+                    existing_cluster.total_alerts = cluster_data["count"]
+                    existing_cluster.priority_score = cluster_priority["priority_score"]
+                    existing_cluster.priority_rank = cluster_priority["priority_rank"]
+                    existing_cluster.last_seen = datetime.utcnow()
+                    existing_cluster.occurrence_count_7d += 1
+                else:
+                    new_cluster = AlertCluster(
+                        cluster_id=cluster_id,
+                        root_cause_pattern=cluster_data.get("representative", ""),
+                        total_alerts=cluster_data["count"],
+                        severity_distribution={"critical": 0, "warning": 0, "normal": 0},
+                        affected_services=cluster_data.get("services", []),
+                        priority_score=cluster_priority["priority_score"],
+                        priority_rank=cluster_priority["priority_rank"],
+                        occurrence_count_7d=1,
+                        first_seen=datetime.utcnow(),
+                        last_seen=datetime.utcnow()
+                    )
+                    db.add(new_cluster)
+            
+            # Sort clusters by priority score (highest first)
+            result["clusters"].sort(key=lambda x: x.get("priority_score", 0), reverse=True)
+            
+            # Update rank numbers after sorting
+            for idx, cluster in enumerate(result["clusters"], 1):
+                cluster["priority_rank"] = idx
+            
+            db.commit()
+
         redis_client.setex(cache_key, settings.LOG_CLUSTER_CACHE_TTL, json.dumps(result))
 
-        # audit log for clustering
         AuditLogger.log(
             db=db,
             user_id=current_user.id,
@@ -205,4 +251,39 @@ def get_log_clusters(
         return result
 
     except Exception as e:
+        db.rollback()
         return {"error": str(e)}
+
+
+@router.get("/opsgpt/clusters/ranked")
+def get_ranked_clusters(
+    db: Session = Depends(get_db),
+    _: dict = Depends(get_current_user)
+):
+    """NEW endpoint for GAP 1: Get all clusters sorted by priority"""
+    try:
+        clusters = db.query(AlertCluster).filter(
+            AlertCluster.status == "active"
+        ).order_by(AlertCluster.priority_score.desc()).all()
+        
+        return {
+            "clusters": [
+                {
+                    "cluster_id": c.cluster_id,
+                    "root_cause_pattern": c.root_cause_pattern,
+                    "total_alerts": c.total_alerts,
+                    "priority_score": c.priority_score,
+                    "priority_rank": idx + 1,
+                    "occurrence_count_7d": c.occurrence_count_7d,
+                    "status": c.status,
+                    "first_seen": c.first_seen.isoformat() if c.first_seen else None,
+                    "last_seen": c.last_seen.isoformat() if c.last_seen else None
+                }
+                for idx, c in enumerate(clusters)
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    
+    
+    

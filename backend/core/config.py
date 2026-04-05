@@ -1,10 +1,12 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List, Dict, Any
+from dotenv import load_dotenv
+load_dotenv()
 
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "NeuroOps"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     
     # Database
@@ -33,6 +35,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "phi3:mini"
     OLLAMA_TIMEOUT: int = 30
     
+    
     @property
     def OLLAMA_URL(self) -> str:
         return f"http://{self.OLLAMA_HOST}:{self.OLLAMA_PORT}"
@@ -45,20 +48,25 @@ class Settings(BaseSettings):
     INFRAMIND_SCALER_FILE: str = "inframind_scaler.pkl"
     SHAP_BACKGROUND_SAMPLES: int = 100
     
-    # Failure Model
-    FAILURE_MODEL_FILE: str = "failure_model.pkl"
-    FAILURE_SCALER_FILE: str = "failure_scaler.pkl"
-    FAILURE_MODEL_ACCURACY: str = "96%"
-    FAILURE_CACHE_TTL: int = 120
-    FAILURE_PROB_CRITICAL: float = 70.0
-    FAILURE_PROB_WARNING: float = 40.0
+    # ========== UPDATED: REAL DATA MODELS ==========
+    # Failure Model - Now using XGBoost trained on REAL EC2 data
+    FAILURE_MODEL_FILE: str = "xgboost_production_model.pkl"
+    FAILURE_MODEL_METADATA: str = "model_metadata.pkl"
+    FAILURE_SCALER_FILE: str = ""  # XGBoost doesn't need scaler
     
-    # RUL Models
-    RUL_MODEL_A_FILE: str = "failure_rul_model.pkl"
-    RUL_SCALER_A_FILE: str = "failure_rul_scaler.pkl"
-    RUL_MODEL_B_FILE: str = "failure_rul_model_b.pkl"
-    RUL_SCALER_B_FILE: str = "failure_rul_scaler_b.pkl"
-    RUL_MODEL_A_NAME: str = "RandomForestRegressor (RUL)"
+    # RUL Model - New model trained on REAL EC2 data
+    RUL_MODEL_FILE: str = "rul_real_model.pkl"
+    RUL_SCALER_FILE: str = "rul_real_scaler.pkl"
+    RUL_MODEL_METADATA: str = "rul_model_metadata.pkl"
+    
+    # Keep old config for backward compatibility (will be removed later)
+    RUL_MODEL_A_FILE: str = "rul_real_model.pkl"  # Point to new model
+    RUL_SCALER_A_FILE: str = "rul_real_scaler.pkl"
+    RUL_MODEL_B_FILE: str = ""  # Deprecated
+    RUL_SCALER_B_FILE: str = ""  # Deprecated
+    # ========== END UPDATED ==========
+    
+    RUL_MODEL_A_NAME: str = "RandomForestRegressor (RUL on REAL EC2 data)"
     RUL_URGENCY_CRITICAL: int = 10
     RUL_URGENCY_HIGH: int = 30
     RUL_URGENCY_MEDIUM: int = 60
@@ -139,22 +147,21 @@ class Settings(BaseSettings):
     ANALYZER_RETRY_DELAY: int = 5  # seconds between retries
     
     # Failure Correlation
-    NUM_SENSORS: int = 24
+    NUM_SENSORS: int = 4  # Reduced to 4 (CPU, Memory, Disk, Age) for REAL data
     CORRELATION_MIN_SERVICES: int = 2
     CORRELATION_RUL_THRESHOLD: int = 20
     CORRELATION_MESSAGE_CORRELATED: str = "Multiple services showing similar degradation patterns — potential systemic issue"
     CORRELATION_MESSAGE_INDEPENDENT: str = "Services showing independent degradation patterns"
     URGENCY_RISK_LEVELS: List[str] = ["CRITICAL", "HIGH"]
     
-    # Sensor Variation
+    # Sensor Variation (keeping for backward compatibility)
     SENSOR_VARIATION_STRENGTH: float = 0.08
     SENSOR_VARIATION_MIN: float = 0.97
     SENSOR_VARIATION_MAX: float = 1.05
-    
     DEGRADATION_FACTOR_MIN: float = 0.7
     DEGRADATION_FACTOR_MAX: float = 1.3
-    CRITICAL_SENSORS: List[int] = [1, 2, 3, 9, 11, 15]
-    MODERATE_SENSORS: List[int] = [4, 5, 6, 7, 8, 10]
+    CRITICAL_SENSORS: List[int] = [1, 2, 3]
+    MODERATE_SENSORS: List[int] = [4]
     CRITICAL_SENSOR_DEGRADATION_MIN: float = 0.95
     CRITICAL_SENSOR_DEGRADATION_MAX: float = 1.15
     MODERATE_SENSOR_DEGRADATION_MIN: float = 0.98
@@ -167,47 +174,37 @@ class Settings(BaseSettings):
     }
     SENSOR_CAP_MULTIPLIER: float = 1.05
     
-    # Service Baselines
+    # Service Baselines (updated for REAL data - using 4 features)
     SERVICE_BASELINES: Dict[str, Dict[str, float]] = {
         "default": {
-            "sensor1": 518.67, "sensor2": 642.46, "sensor3": 1583.25, "sensor4": 1407.91,
-            "sensor5": 14.62, "sensor6": 21.61, "sensor7": 553.69, "sensor8": 2388.09,
-            "sensor9": 9050.17, "sensor10": 1.3, "sensor11": 47.28, "sensor12": 521.72,
-            "sensor13": 2388.09, "sensor14": 8138.62, "sensor15": 8.42, "sensor16": 0.03,
-            "sensor17": 392.0, "sensor18": 2388.0, "sensor19": 100.0, "sensor20": 38.86,
-            "sensor21": 23.36, "sensor22": 0.0, "sensor23": 0.0, "sensor24": 0.0
+            "cpu": 50.0,
+            "memory": 40.0,
+            "disk": 30.0,
+            "age": 30
         },
         "engine_api": {
-            "sensor1": 518.67, "sensor2": 642.46, "sensor3": 1583.25, "sensor4": 1407.91,
-            "sensor5": 14.62, "sensor6": 21.61, "sensor7": 553.69, "sensor8": 2388.09,
-            "sensor9": 9050.17, "sensor10": 1.3, "sensor11": 47.28, "sensor12": 521.72,
-            "sensor13": 2388.09, "sensor14": 8138.62, "sensor15": 8.42, "sensor16": 0.03,
-            "sensor17": 392.0, "sensor18": 2388.0, "sensor19": 100.0, "sensor20": 38.86,
-            "sensor21": 23.36, "sensor22": 0.0, "sensor23": 0.0, "sensor24": 0.0
+            "cpu": 45.0,
+            "memory": 35.0,
+            "disk": 25.0,
+            "age": 30
         },
         "payment_service": {
-            "sensor1": 502.34, "sensor2": 621.89, "sensor3": 1523.67, "sensor4": 1389.45,
-            "sensor5": 13.89, "sensor6": 20.45, "sensor7": 534.21, "sensor8": 2356.78,
-            "sensor9": 8876.45, "sensor10": 1.2, "sensor11": 45.67, "sensor12": 512.34,
-            "sensor13": 2356.78, "sensor14": 7987.34, "sensor15": 7.89, "sensor16": 0.02,
-            "sensor17": 378.45, "sensor18": 2356.78, "sensor19": 98.5, "sensor20": 37.23,
-            "sensor21": 22.15, "sensor22": 0.0, "sensor23": 0.0, "sensor24": 0.0
+            "cpu": 60.0,
+            "memory": 50.0,
+            "disk": 40.0,
+            "age": 30
         },
         "auth_service": {
-            "sensor1": 489.23, "sensor2": 598.45, "sensor3": 1498.34, "sensor4": 1356.78,
-            "sensor5": 12.45, "sensor6": 19.87, "sensor7": 521.45, "sensor8": 2321.45,
-            "sensor9": 8723.67, "sensor10": 1.1, "sensor11": 43.21, "sensor12": 498.67,
-            "sensor13": 2321.45, "sensor14": 7856.23, "sensor15": 7.23, "sensor16": 0.02,
-            "sensor17": 365.89, "sensor18": 2321.45, "sensor19": 97.2, "sensor20": 35.67,
-            "sensor21": 21.45, "sensor22": 0.0, "sensor23": 0.0, "sensor24": 0.0
+            "cpu": 40.0,
+            "memory": 30.0,
+            "disk": 20.0,
+            "age": 30
         },
         "cache_layer": {
-            "sensor1": 445.67, "sensor2": 567.89, "sensor3": 1432.45, "sensor4": 1289.34,
-            "sensor5": 11.23, "sensor6": 18.34, "sensor7": 498.76, "sensor8": 2245.67,
-            "sensor9": 8456.78, "sensor10": 0.9, "sensor11": 41.23, "sensor12": 478.45,
-            "sensor13": 2245.67, "sensor14": 7567.89, "sensor15": 6.78, "sensor16": 0.01,
-            "sensor17": 345.67, "sensor18": 2245.67, "sensor19": 95.8, "sensor20": 33.45,
-            "sensor21": 20.12, "sensor22": 0.0, "sensor23": 0.0, "sensor24": 0.0
+            "cpu": 35.0,
+            "memory": 45.0,
+            "disk": 15.0,
+            "age": 30
         }
     }
     
@@ -268,9 +265,9 @@ class Settings(BaseSettings):
     SLACK_WEBHOOK_URL: Optional[str] = None
     SLACK_NOTIFICATIONS_ENABLED: bool = False
     
-    # Pydantic V2 configuration (FIXED - replaces class Config)
+    # Pydantic V2 configuration
     model_config = SettingsConfigDict(
-        env_file="backend/.env",
+        env_file=".env",
         case_sensitive=True,
         extra="ignore"
     )

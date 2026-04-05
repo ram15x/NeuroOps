@@ -29,3 +29,7 @@ boto3==1.28.61
 botocore==1.31.61
 tensorflow==2.13.0
 xgboost==2.0.2
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.1

@@ -24,6 +24,12 @@ class Alert(Base):
     anomaly_score = Column(Float)
     message = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # NEW for GAP 1: Priority ranking
+    priority_score = Column(Float, default=0.0)
+    priority_rank = Column(Integer, default=0)
+    cluster_id = Column(String, nullable=True)  # Which cluster this alert belongs to
+    auto_resolved = Column(Boolean, default=False)
 
 
 class User(Base):
@@ -38,9 +44,42 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # relationships
     audit_logs = relationship("AuditLog", back_populates="user")
     healing_actions = relationship("HealingAction", back_populates="user")
+
+
+class Service(Base):
+    """NEW TABLE for GAP 1: Service-level configuration"""
+    __tablename__ = "services"
+
+    id = Column(Integer, primary_key=True, index=True)
+    service_name = Column(String, unique=True, index=True, nullable=False)
+    business_impact = Column(Integer, default=10)  # 1-100, higher = more important
+    sla_minutes = Column(Integer, default=5)  # SLA response time in minutes
+    on_call_group = Column(String, default="default")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AlertCluster(Base):
+    """NEW TABLE for GAP 1: Store cluster information"""
+    __tablename__ = "alert_clusters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cluster_id = Column(String, unique=True, index=True, nullable=False)
+    root_cause_pattern = Column(String)  # The common root cause for this cluster
+    total_alerts = Column(Integer, default=0)
+    severity_distribution = Column(JSON, default={})  # {"critical": 10, "warning": 5, "normal": 2}
+    affected_services = Column(JSON, default=[])  # List of service names
+    priority_score = Column(Float, default=0.0)
+    priority_rank = Column(Integer, default=0)
+    occurrence_count_7d = Column(Integer, default=0)  # Repeat offender tracking
+    auto_fix_success_count = Column(Integer, default=0)
+    auto_fix_total_attempts = Column(Integer, default=0)
+    status = Column(String, default="active")  # active, auto_resolved, archived
+    first_seen = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
 
 
 class PredictionHistory(Base):
@@ -54,6 +93,7 @@ class PredictionHistory(Base):
     confidence_score = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 class MetricHistory(Base):
     __tablename__ = "metric_history"
 
@@ -62,10 +102,9 @@ class MetricHistory(Base):
     metric_name = Column(String, index=True, nullable=False)
     value = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-
-    # Optional: add metadata
-    source = Column(String, default="cloudwatch")  # cloudwatch, custom, etc.
+    source = Column(String, default="cloudwatch")
     unit = Column(String, default="percent")
+
 
 class HealingAction(Base):
     __tablename__ = "healing_actions"
@@ -81,7 +120,6 @@ class HealingAction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     
-    # relationships
     user = relationship("User", back_populates="healing_actions")
 
 
@@ -98,7 +136,6 @@ class AuditLog(Base):
     user_agent = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # relationships
     user = relationship("User", back_populates="audit_logs")
 
 

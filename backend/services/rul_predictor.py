@@ -6,37 +6,40 @@ from sklearn.preprocessing import StandardScaler
 
 from backend.core.config import settings
 
-MODEL_PATH = os.path.join(settings.MODEL_PATH, settings.RUL_MODEL_A_FILE)
-SCALER_PATH = os.path.join(settings.MODEL_PATH, settings.RUL_SCALER_A_FILE)
+# Use REAL RUL model trained on EC2 data
+MODEL_PATH = os.path.join(settings.MODEL_PATH, settings.RUL_MODEL_FILE)
+SCALER_PATH = os.path.join(settings.MODEL_PATH, settings.RUL_SCALER_FILE)
 
 model = joblib.load(MODEL_PATH)
 scaler = joblib.load(SCALER_PATH)
 
 
-def predict_rul(sensor_values: list) -> dict:
-    """Predict RUL with confidence interval"""
+def predict_rul(cpu_usage: float, memory_usage: float, disk_usage: float, instance_age_days: int) -> dict:
+    """
+    Predict RUL using REAL EC2 metrics (CPU, Memory, Disk, Age)
+    No more turbofan sensors!
+    """
     
-    X = np.array(sensor_values).reshape(1, -1)
-    X_scaled = scaler.transform(X)
+    # Prepare features for REAL EC2 data
+    features = np.array([[cpu_usage, memory_usage, disk_usage, instance_age_days]])
+    X_scaled = scaler.transform(features)
 
     cycles_left = float(model.predict(X_scaled)[0])
     cycles_left = max(0.0, round(cycles_left, 1))
     hours_left = round(cycles_left * settings.HOURS_PER_CYCLE, 1)
 
     # Calculate confidence interval using model's internal uncertainty
-    # For Random Forest, use predictions from individual trees
     if hasattr(model, 'estimators_'):
         tree_predictions = [tree.predict(X_scaled)[0] for tree in model.estimators_]
         lower_bound = max(0.0, round(np.percentile(tree_predictions, 10), 1))
         upper_bound = max(0.0, round(np.percentile(tree_predictions, 90), 1))
-        confidence = 80  # 80% confidence interval
+        confidence = 80
     else:
-        # Fallback: ±15% interval
         lower_bound = max(0.0, round(cycles_left * 0.85, 1))
         upper_bound = round(cycles_left * 1.15, 1)
         confidence = 70
 
-    # Urgency bands
+    # Urgency bands based on cycles remaining
     if cycles_left <= settings.RUL_URGENCY_CRITICAL:
         urgency = "CRITICAL"
         recommendation = f"Shut down immediately. Failure imminent within {settings.RUL_URGENCY_CRITICAL} cycles."
@@ -45,10 +48,10 @@ def predict_rul(sensor_values: list) -> dict:
         recommendation = f"Schedule maintenance now. Failure expected within {settings.RUL_URGENCY_HIGH} cycles."
     elif cycles_left <= settings.RUL_URGENCY_MEDIUM:
         urgency = "MEDIUM"
-        recommendation = "Plan maintenance soon. Engine degrading."
+        recommendation = "Plan maintenance soon. Instance degrading."
     else:
         urgency = "LOW"
-        recommendation = "Engine healthy. Continue monitoring."
+        recommendation = "Instance healthy. Continue monitoring."
 
     return {
         "cycles_remaining": cycles_left,
@@ -57,15 +60,16 @@ def predict_rul(sensor_values: list) -> dict:
         "upper_bound": upper_bound,
         "confidence_pct": confidence,
         "urgency": urgency,
-        "recommendation": recommendation
+        "recommendation": recommendation,
+        "model_used": "rul_real_model"
     }
 
 
-def predict_rul_with_interval(sensor_values: list, confidence: float = 95) -> dict:
-    """Predict RUL with custom confidence interval"""
+def predict_rul_with_interval(cpu_usage: float, memory_usage: float, disk_usage: float, instance_age_days: int, confidence: float = 95) -> dict:
+    """Predict RUL with custom confidence interval using REAL EC2 data"""
     
-    X = np.array(sensor_values).reshape(1, -1)
-    X_scaled = scaler.transform(X)
+    features = np.array([[cpu_usage, memory_usage, disk_usage, instance_age_days]])
+    X_scaled = scaler.transform(features)
 
     cycles_left = float(model.predict(X_scaled)[0])
     cycles_left = max(0.0, round(cycles_left, 1))
@@ -79,14 +83,13 @@ def predict_rul_with_interval(sensor_values: list, confidence: float = 95) -> di
         elif confidence == 95:
             lower = np.percentile(tree_predictions, 2.5)
             upper = np.percentile(tree_predictions, 97.5)
-        else:  # default 80%
+        else:
             lower = np.percentile(tree_predictions, 10)
             upper = np.percentile(tree_predictions, 90)
         
         lower_bound = max(0.0, round(lower, 1))
         upper_bound = max(0.0, round(upper, 1))
     else:
-        # Fallback
         factor = confidence / 100
         lower_bound = max(0.0, round(cycles_left * (1 - factor * 0.2), 1))
         upper_bound = round(cycles_left * (1 + factor * 0.2), 1)
@@ -97,3 +100,14 @@ def predict_rul_with_interval(sensor_values: list, confidence: float = 95) -> di
         "upper_bound": upper_bound,
         "confidence_pct": confidence
     }
+
+
+# Keep legacy function for backward compatibility (will be deprecated)
+def predict_rul_from_sensors(sensor_values: list) -> dict:
+    """Legacy function - extracts REAL metrics from first 4 sensors"""
+    cpu = sensor_values[0] if len(sensor_values) > 0 else 0
+    memory = sensor_values[4] if len(sensor_values) > 4 else 0
+    disk = sensor_values[5] if len(sensor_values) > 5 else 0
+    age = int(sensor_values[3]) if len(sensor_values) > 3 else 30
+    
+    return predict_rul(cpu, memory, disk, age)

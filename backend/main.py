@@ -13,7 +13,9 @@ from backend.models.database import init_db
 from backend.services.log_clusterer import run_daily_clustering
 import threading
 import time
-
+from backend.api import agent
+from backend.api import rootcause
+from backend.api import services
 # Routers
 from backend.api import (
     auth, inframind, opsgpt, failure, scalewise,
@@ -116,6 +118,9 @@ app.include_router(pipeline.router,     prefix="/api/v1", tags=["Data Pipeline"]
 app.include_router(health.router,       tags=["Health"])
 app.include_router(aws.router,          prefix="/api/v1", tags=["AWS"])
 app.include_router(incidents.router,    prefix="/api/v1", tags=["Incidents"])
+app.include_router(services.router, prefix="/api/v1", tags=["services"])
+app.include_router(rootcause.router, prefix="/api/v1", tags=["rootcause"])
+app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
 
 
 def run_daily_clustering_background():

@@ -2,6 +2,8 @@ import boto3
 import json
 import os
 import time
+from functools import wraps
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -10,6 +12,43 @@ from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Rate limiting setup
+_rate_limit_tracker = defaultdict(list)
+RATE_LIMIT_PER_MINUTE = 60  # Max 60 calls per minute
+RATE_LIMIT_PER_HOUR = 1000  # Max 1000 calls per hour
+
+def rate_limit(limit_per_minute: int = 60, limit_per_hour: int = 1000):
+    """Decorator for rate limiting AWS API calls"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            now = time.time()
+            minute_ago = now - 60
+            hour_ago = now - 3600
+            
+            # Clean old entries (keep last hour for hour limit check)
+            _rate_limit_tracker[func.__name__] = [
+                t for t in _rate_limit_tracker[func.__name__] 
+                if t > hour_ago
+            ]
+            
+            # Check minute limit
+            minute_calls = len([t for t in _rate_limit_tracker[func.__name__] if t > minute_ago])
+            if minute_calls >= limit_per_minute:
+                logger.warning(f"Rate limit exceeded for {func.__name__}: {minute_calls}/{limit_per_minute} per minute")
+                raise Exception(f"Rate limit exceeded for {func.__name__}. Please wait before retrying.")
+            
+            # Check hour limit
+            if len(_rate_limit_tracker[func.__name__]) >= limit_per_hour:
+                logger.warning(f"Hourly rate limit exceeded for {func.__name__}: {len(_rate_limit_tracker[func.__name__])}/{limit_per_hour}")
+                raise Exception(f"Hourly rate limit exceeded for {func.__name__}. Please try again later.")
+            
+            _rate_limit_tracker[func.__name__].append(now)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def get_ec2_client():
     return boto3.client(
         "ec2",
@@ -17,6 +56,7 @@ def get_ec2_client():
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         region_name=settings.AWS_REGION
     )
+
 
 def get_cloudwatch_client():
     return boto3.client(
@@ -45,6 +85,7 @@ def get_sns_client():
     )
 
 
+@rate_limit()
 def fetch_cloudwatch_metrics(instance_id: str, minutes: int = 60) -> dict:
     """
     fetch cpu, network in/out, disk read/write for a given ec2 instance.
@@ -119,6 +160,7 @@ def fetch_cloudwatch_metrics(instance_id: str, minutes: int = 60) -> dict:
     return results
 
 
+@rate_limit()
 def list_ec2_instances() -> list:
     """
     list all ec2 instances in the account with id, name, state, type.
@@ -155,6 +197,7 @@ def list_ec2_instances() -> list:
         return []
 
 
+@rate_limit()
 def upload_model_to_s3(local_path: str, s3_key: str) -> dict:
     """
     upload a local .pkl file to s3 bucket.
@@ -170,7 +213,61 @@ def upload_model_to_s3(local_path: str, s3_key: str) -> dict:
         logger.error(f"s3 upload failed: {e}")
         return {"success": False, "error": str(e)}
 
+@rate_limit()
+def send_sns_alert_with_timeline(subject: str, message: str, alert_id: int = None, timeline: dict = None) -> dict:
+    """
+    Publish an alert message with root cause timeline included.
+    Used when critical anomaly is detected.
+    """
+    client = get_sns_client()
+    
+    # Enrich message with timeline if provided
+    if timeline and alert_id and "error" not in timeline:
+        enriched_message = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 NEUROOPS ALERT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+{message}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🔍 ROOT CAUSE TIMELINE
+━━━━━━━━━━━━━━━━━━━━━━
+
+📌 Root Cause: {timeline.get('root_cause', 'Unknown')}
+🎯 Confidence: {timeline.get('confidence', 0)}%
+
+📊 Event Timeline:
+"""
+        # Add top 5 events
+        for event in timeline.get('timeline', [])[:5]:
+            enriched_message += f"   • {event['time_relative']}: {event['description']}\n"
+        
+        enriched_message += f"""
+━━━━━━━━━━━━━━━━━━━━━━
+💡 Recommendation
+━━━━━━━━━━━━━━━━━━━━━━
+{timeline.get('recommendation', 'Manual investigation required')}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🔗 View full timeline: http://localhost:8000/dashboard/rootcause/{alert_id}
+━━━━━━━━━━━━━━━━━━━━━━
+"""
+        message = enriched_message
+    
+    try:
+        response = client.publish(
+            TopicArn=settings.SNS_TOPIC_ARN,
+            Subject=subject[:100],
+            Message=message,
+        )
+        message_id = response.get("MessageId", "")
+        logger.info(f"SNS alert sent with timeline: {message_id}")
+        return {"success": True, "message_id": message_id}
+    except Exception as e:
+        logger.error(f"SNS publish failed: {e}")
+        return {"success": False, "error": str(e)}
+@rate_limit()
 def download_model_from_s3(s3_key: str, local_path: str) -> dict:
     """
     download a model from s3 to local path.
@@ -186,6 +283,7 @@ def download_model_from_s3(s3_key: str, local_path: str) -> dict:
         return {"success": False, "error": str(e)}
 
 
+@rate_limit()
 def list_s3_models() -> list:
     """
     list all objects in the s3 bucket under models/ prefix.
@@ -209,6 +307,7 @@ def list_s3_models() -> list:
         return []
 
 
+@rate_limit()
 def send_sns_alert(subject: str, message: str) -> dict:
     """
     publish an alert message to the sns topic.
@@ -274,6 +373,8 @@ def check_aws_connection() -> dict:
 
     return status
 
+
+@rate_limit()
 def get_ec2_status_checks(instance_id: str) -> dict:
     """Fetch EC2 status check results (instance reachability)"""
     try:
@@ -303,8 +404,9 @@ def get_ec2_status_checks(instance_id: str) -> dict:
     except Exception as e:
         logger.error(f"Failed to get EC2 status for {instance_id}", error=str(e))
         return {"error": str(e), "is_healthy": False}
-    
 
+
+@rate_limit()
 def fetch_ec2_memory_metrics(instance_id: str, minutes: int = 5) -> list:
     """Fetch memory usage metrics from CustomMetrics"""
     try:
@@ -333,6 +435,8 @@ def fetch_ec2_memory_metrics(instance_id: str, minutes: int = 5) -> list:
         logger.error(f"Failed to fetch memory metrics: {e}")
         return []
 
+
+@rate_limit()
 def fetch_ec2_disk_metrics(instance_id: str, minutes: int = 5) -> list:
     """Fetch disk usage metrics from CustomMetrics"""
     try:
@@ -360,7 +464,9 @@ def fetch_ec2_disk_metrics(instance_id: str, minutes: int = 5) -> list:
     except Exception as e:
         logger.error(f"Failed to fetch disk metrics: {e}")
         return []
-    
+
+
+@rate_limit()
 def scale_up_instance(instance_id: str) -> dict:
     """Change EC2 instance to next larger type"""
     try:
@@ -398,4 +504,13 @@ def scale_up_instance(instance_id: str) -> dict:
         
     except Exception as e:
         logger.error(f"Scale up failed: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e)}  # <-- REMOVE the 's' at the end!
+    
+def get_logs_client():
+    """Get CloudWatch Logs client"""
+    return boto3.client(
+        "logs",
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.AWS_REGION,
+    )

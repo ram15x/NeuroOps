@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 import time
 import json
 import boto3
+import hashlib
 
 from backend.core.config import settings
 from backend.core.logger import get_logger
 from backend.models.database import HealingAction
 from backend.services.redis_service import redis_client
+from backend.services.auto_resolve import update_cluster_stats_on_healing
 
 logger = get_logger(__name__)
 
@@ -572,6 +574,7 @@ class HealingExecutor:
         status = "pending"
         message = ""
         rollback_triggered = False
+        verification = {"verified": False}
 
         if settings.AUTO_HEALING_ENABLED:
             if action_data["action"] == "restart":
@@ -618,10 +621,10 @@ class HealingExecutor:
                 
                 if verification.get("verified"):
                     logger.info(f"Healing SUCCESSFUL for {action_data['service']}: {verification.get('improvement_pct')}% improvement")
-                    message += f" ✅ Verified: {verification.get('improvement_pct')}% improvement"
+                    message += f" Verified: {verification.get('improvement_pct')}% improvement"
                 else:
                     logger.warning(f"Healing MAY HAVE FAILED for {action_data['service']}: {verification.get('reason', 'No verification')}")
-                    message += f" ⚠️ Unverified: {verification.get('reason', 'No improvement detected')}"
+                    message += f" Unverified: {verification.get('reason', 'No improvement detected')}"
                     
                     # ========== AUTO ROLLBACK ON FAILURE ==========
                     if action_data["action"] in ["scale_up", "scale_down", "restart_service"]:
@@ -629,9 +632,35 @@ class HealingExecutor:
                         rollback_result = self._execute_rollback(action_data["service"])
                         if rollback_result.get("success"):
                             rollback_triggered = True
-                            message += f" 🔄 Auto-rollback executed: {rollback_result.get('message')}"
+                            message += f" Auto-rollback executed: {rollback_result.get('message')}"
                         else:
-                            message += f" ⚠️ Auto-rollback failed: {rollback_result.get('error')}"
+                            message += f" Auto-rollback failed: {rollback_result.get('error')}"
+
+                # ========== AUTO-RESOLVE INTEGRATION ==========
+                # Update cluster stats for auto-resolve tracking
+                try:
+                    cluster_id = decision.context.get("cluster_id")
+                    if not cluster_id and action_data["service"]:
+                        pattern = f"{action_data['service']}_{action_data['metric_type']}_{action_data['reason'][:50]}"
+                        cluster_id = f"cluster_{hashlib.md5(pattern.encode()).hexdigest()[:16]}"
+                    
+                    auto_resolve_result = update_cluster_stats_on_healing(
+                        cluster_id=cluster_id,
+                        healing_success=verification.get("verified", False),
+                        db=self.db
+                    )
+                    
+                    if auto_resolve_result.get("auto_resolved"):
+                        logger.info(f"AUTO-RESOLVED: Cluster {cluster_id} marked as resolved")
+                        message += f" Auto-resolved: This issue will not page on-call next time"
+                        
+                        if hasattr(self, 'healing_action'):
+                            self.healing_action.details["auto_resolved"] = True
+                            self.healing_action.details["auto_resolve_result"] = auto_resolve_result
+                            self.db.commit()
+                            
+                except Exception as e:
+                    logger.error(f"Auto-resolve integration failed: {e}")
                 
                 aws_result["verification"] = verification
 
@@ -665,13 +694,16 @@ class HealingExecutor:
                 "metric_type": action_data["metric_type"],
                 "requires_approval": action_data["requires_approval"],
                 "aws_result": aws_result,
-                "rollback_triggered": rollback_triggered
+                "rollback_triggered": rollback_triggered,
+                "verification": verification
             },
             created_at=datetime.utcnow(),
             completed_at=datetime.utcnow() if status in ["completed", "failed"] else None
         )
         self.db.add(healing_action)
         self.db.commit()
+        
+        self.healing_action = healing_action
 
         return result
 

@@ -1,5 +1,6 @@
 import threading
 import time
+from datetime import timezone
 import json
 from datetime import datetime
 from backend.core.config import settings
@@ -26,10 +27,10 @@ def run_correlation_check(db, instance_id: str, cpu_value: float):
         from backend.models.schemas import ServiceSensorInput, CorrelationRequest
 
         services = [
-            ServiceSensorInput(service_name="payment-service",  sensors=[cpu_value]),
-            ServiceSensorInput(service_name="auth-service",     sensors=[cpu_value]),
-            ServiceSensorInput(service_name="api-gateway",      sensors=[cpu_value]),
-            ServiceSensorInput(service_name="database-proxy",   sensors=[cpu_value]),
+            ServiceSensorInput(service_name="payment-service", sensors=[cpu_value]),
+            ServiceSensorInput(service_name="auth-service", sensors=[cpu_value]),
+            ServiceSensorInput(service_name="api-gateway", sensors=[cpu_value]),
+            ServiceSensorInput(service_name="database-proxy", sensors=[cpu_value]),
         ]
 
         request = CorrelationRequest(services=services)
@@ -61,6 +62,42 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
     rolling_std = 0
     value_diff = 0
     days_low_cpu = 0
+    
+    # ========== FETCH MEMORY AND DISK FIRST (BEFORE ALERT) ==========
+    try:
+        memory_data = fetch_ec2_memory_metrics(instance_id, minutes=5)
+        if memory_data:
+            memory_percent = memory_data[-1]["value"]
+            redis_client.setex(f"memory:{instance_id}", 300, str(memory_percent))
+        
+        disk_data = fetch_ec2_disk_metrics(instance_id, minutes=5)
+        if disk_data:
+            disk_percent = disk_data[-1]["value"]
+            redis_client.setex(f"disk:{instance_id}", 300, str(disk_percent))
+            
+        logger.info(f"Memory: {memory_percent}%, Disk: {disk_percent}%")
+        
+        # Store memory/disk history
+        if memory_percent > 0:
+            mem_history = MetricHistory(
+                instance_id=instance_id,
+                metric_name="memory",
+                value=memory_percent,
+                timestamp=datetime.utcnow(),
+                source="custom"
+            )
+            db.add(mem_history)
+        if disk_percent > 0:
+            disk_history = MetricHistory(
+                instance_id=instance_id,
+                metric_name="disk",
+                value=disk_percent,
+                timestamp=datetime.utcnow(),
+                source="custom"
+            )
+            db.add(disk_history)
+    except Exception as e:
+        logger.error(f"Failed to fetch memory/disk metrics: {e}")
     
     try:
         # Get history from Redis
@@ -128,7 +165,7 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
             logger.error(f"InfraMind stage failed: {e}")
             infra_result = {"is_anomaly": False, "severity": "normal", "anomaly_score": 0}
         
-        # ========== GET STATUS DATA ==========
+        # ========== FETCH STATUS CHECKS ==========
         try:
             status_data = get_ec2_status_checks(instance_id)
             status_ok = status_data.get("is_healthy", False)
@@ -136,12 +173,16 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
             recent_reboots = int(redis_client.get(reboot_key) or 0)
             instances = list_ec2_instances()
             for inst in instances:
-                if inst.get("instance_id") == instance_id and inst.get("launch_time"):
-                    try:
-                        launch_date = datetime.fromisoformat(inst["launch_time"].replace('Z', '+00:00'))
-                        age_days = (datetime.utcnow() - launch_date).days
-                    except:
-                        pass
+                if inst.get("instance_id") == instance_id:
+                    if inst.get("launch_time"):
+                        try:
+                            launch_time_str = inst["launch_time"].replace('Z', '+00:00')
+                            launch_date = datetime.fromisoformat(launch_time_str)
+                            now = datetime.now(timezone.utc)
+                            age_days = (now - launch_date).days
+                            logger.info(f"Instance age calculated: {age_days} days")
+                        except Exception as e:
+                            logger.error(f"Failed to parse launch_time: {e}")
         except Exception as e:
             logger.warning(f"Failed to get status data: {e}")
         
@@ -149,12 +190,11 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
         low_cpu_key = f"low_cpu_days:{instance_id}"
         if cpu_value < 20:
             days_low = redis_client.incr(low_cpu_key)
-            redis_client.expire(low_cpu_key, 7 * 86400)  # 7 days expiry
+            redis_client.expire(low_cpu_key, 7 * 86400)
             logger.debug(f"CPU low for {days_low} consecutive days for {instance_id}")
         else:
             redis_client.delete(low_cpu_key)
             days_low = 0
-        # ========== END SCALE DOWN TRACKING ==========
         
         # ========== STAGE 3: FAILURE PREDICTION ==========
         try:
@@ -162,7 +202,9 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 cpu_usage=cpu_value,
                 status_check_ok=status_ok,
                 recent_reboots=recent_reboots,
-                instance_age_days=age_days
+                instance_age_days=age_days,
+                memory_usage=memory_percent,
+                disk_usage=disk_percent
             )
             failure_result = prediction
             
@@ -183,6 +225,8 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 model_name="failure_predictor",
                 input_features={
                     "cpu": cpu_value,
+                    "memory": memory_percent,
+                    "disk": disk_percent,
                     "status_ok": status_ok,
                     "recent_reboots": recent_reboots,
                     "instance_age_days": age_days
@@ -196,75 +240,13 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
             )
             db.add(pred_history)
             
-            logger.info(f"Failure prediction: {prediction['risk_level']} ({prediction['failure_probability']}%)")
+            logger.info(f"Failure prediction: {prediction['risk_level']} ({prediction['failure_probability']}%) with real memory={memory_percent}%, disk={disk_percent}%")
             
-            if prediction["risk_level"] in ["CRITICAL", "WARNING"]:
-                # Enhanced SNS message with all metrics
-                alert_message = f"""
-╔══════════════════════════════════════════════════════════════╗
-║                    🚨 NEUROOPS ALERT 🚨                      ║
-╠══════════════════════════════════════════════════════════════╣
-║ Instance: {instance_id}
-║ Risk Level: {prediction['risk_level']}
-║ Failure Probability: {prediction['failure_probability']}%
-║
-║ 📊 CURRENT METRICS:
-║    • CPU Usage: {cpu_value:.2f}%
-║    • Memory: {memory_percent:.1f}%
-║    • Disk: {disk_percent:.1f}%
-║    • Status Check: {'✅ OK' if status_ok else '❌ FAILING'}
-║    • Recent Reboots: {recent_reboots}
-║    • Instance Age: {age_days} days
-║
-║ 🛠️ RECOMMENDED ACTION:
-║    {prediction['action']}
-║
-║ 📍 Dashboard: http://127.0.0.1:8000/dashboard/index.html
-╚══════════════════════════════════════════════════════════════╝
-"""
-                send_sns_alert(
-                    subject=f"🚨 NEUROOPS: {prediction['risk_level']} - {instance_id[-8:]}",
-                    message=alert_message
-                )
+            # SNS ALERT BLOCK REMOVED - Now handled by InfraMind critical anomalies only
+            
         except Exception as e:
             logger.error(f"Failure prediction stage failed: {e}")
             failure_result = {"risk_level": "UNKNOWN", "failure_probability": 0}
-        
-        # ========== FETCH MEMORY AND DISK ==========
-        try:
-            memory_data = fetch_ec2_memory_metrics(instance_id, minutes=5)
-            if memory_data:
-                memory_percent = memory_data[-1]["value"]
-                redis_client.setex(f"memory:{instance_id}", 300, str(memory_percent))
-            
-            disk_data = fetch_ec2_disk_metrics(instance_id, minutes=5)
-            if disk_data:
-                disk_percent = disk_data[-1]["value"]
-                redis_client.setex(f"disk:{instance_id}", 300, str(disk_percent))
-                
-            logger.info(f"Memory: {memory_percent}%, Disk: {disk_percent}%")
-            
-            # Store memory/disk history
-            if memory_percent > 0:
-                mem_history = MetricHistory(
-                    instance_id=instance_id,
-                    metric_name="memory",
-                    value=memory_percent,
-                    timestamp=datetime.utcnow(),
-                    source="custom"
-                )
-                db.add(mem_history)
-            if disk_percent > 0:
-                disk_history = MetricHistory(
-                    instance_id=instance_id,
-                    metric_name="disk",
-                    value=disk_percent,
-                    timestamp=datetime.utcnow(),
-                    source="custom"
-                )
-                db.add(disk_history)
-        except Exception as e:
-            logger.error(f"Failed to fetch memory/disk metrics: {e}")
         
         # ========== STAGE 4: RUL COUNTDOWN ==========
         try:
@@ -295,32 +277,8 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
             
             logger.info(f"Auto RUL: {rul_result['cycles_remaining']} cycles, urgency={rul_result['urgency']}")
             
-            if rul_result["urgency"] == "CRITICAL":
-                rul_message = f"""
-╔══════════════════════════════════════════════════════════════╗
-║                  🔄 CRITICAL RUL ALERT 🔄                    ║
-╠══════════════════════════════════════════════════════════════╣
-║ Instance: {instance_id}
-║ Cycles Remaining: {rul_result['cycles_remaining']}
-║ Hours Remaining: {rul_result['hours_remaining']}
-║ Urgency: {rul_result['urgency']}
-║
-║ 📊 CURRENT METRICS:
-║    • CPU: {cpu_value:.2f}%
-║    • Memory: {memory_percent:.1f}%
-║    • Disk: {disk_percent:.1f}%
-║    • Status Check: {'✅ OK' if status_ok else '❌ FAILING'}
-║
-║ 🛠️ RECOMMENDATION:
-║    {rul_result['recommendation']}
-║
-║ 📍 Dashboard: http://127.0.0.1:8000/dashboard/index.html
-╚══════════════════════════════════════════════════════════════╝
-"""
-                send_sns_alert(
-                    subject=f"🔄 CRITICAL RUL: {instance_id[-8:]} - {rul_result['cycles_remaining']} cycles left",
-                    message=rul_message
-                )
+            # RUL CRITICAL SNS BLOCK REMOVED - Now handled by InfraMind critical anomalies only
+            
         except Exception as e:
             logger.error(f"RUL stage failed: {e}")
             rul_result = {"cycles_remaining": None, "urgency": "UNKNOWN"}
@@ -351,9 +309,8 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
         except Exception as e:
             logger.error(f"Feature store failed: {e}")
         
-        # ========== STAGE 6: AUTO-HEALING (with Scale Down) ==========
+        # ========== STAGE 6: AUTO-HEALING ==========
         try:
-            # Check for scale down first (low CPU for 7+ days)
             if days_low >= 7 and cpu_value < 20:
                 logger.info(f"LOW CPU for {days_low} days on {instance_id} → triggering scale down")
                 context = {"metric_type": "cpu", "recent_restart_count": 0, "days_low_cpu": days_low}
@@ -362,7 +319,6 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 healing_result = executor.execute(decision)
                 logger.info(f"Scale down result: {healing_result}")
             
-            # Check for memory > 90% → service restart
             elif memory_percent > 90:
                 logger.info(f"HIGH MEMORY on {instance_id}: {memory_percent}% → triggering service restart")
                 context = {"metric_type": "memory", "service_type": "docker", "recent_restart_count": 0}
@@ -371,7 +327,6 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 healing_result = executor.execute(decision)
                 logger.info(f"Memory healing result: {healing_result}")
             
-            # Check for disk > 95% → cleanup
             elif disk_percent > 95:
                 logger.info(f"HIGH DISK on {instance_id}: {disk_percent}% → triggering disk cleanup")
                 context = {"metric_type": "disk", "recent_restart_count": 0}
@@ -380,7 +335,6 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 healing_result = executor.execute(decision)
                 logger.info(f"Disk healing result: {healing_result}")
             
-            # Check for CPU anomaly
             elif infra_result.get("is_anomaly"):
                 logger.info(f"CPU ANOMALY on {instance_id}: {cpu_value}%")
                 context = {"metric_type": "cpu", "recent_restart_count": 0}
@@ -427,13 +381,11 @@ def analyze_and_store_metrics():
             logger.info("No running EC2 instances found")
             return
         
-        # Rate limit: only process up to MAX_INSTANCES_PER_RUN
         instances_to_process = running_instances[:settings.MAX_INSTANCES_PER_RUN]
         
         for idx, instance in enumerate(instances_to_process):
             instance_id = instance["instance_id"]
             
-            # Add delay between instances to avoid AWS throttling
             if idx > 0:
                 time.sleep(settings.ANALYZER_RETRY_DELAY)
             
@@ -477,7 +429,6 @@ def analyzer_loop(interval_seconds: int = 60):
             loop_count += 1
             consecutive_failures = 0
             
-            # Health checkpoint every 100 cycles
             if loop_count % 100 == 0:
                 logger.info(f"Analyzer healthy checkpoint: {loop_count} cycles completed")
                 
@@ -489,23 +440,20 @@ def analyzer_loop(interval_seconds: int = 60):
                 logger.critical(f"Analyzer failed {max_consecutive_failures} times consecutively! Sending alert...")
                 try:
                     crash_message = f"""
-╔══════════════════════════════════════════════════════════════╗
-║              🔴 NEUROOPS ANALYZER CRASHED 🔴                 ║
-╠══════════════════════════════════════════════════════════════╣
-║ The metrics analyzer has failed {max_consecutive_failures} times consecutively.
-║ Manual intervention required.
-║
-║ Please check:
-║   1. AWS credentials
-║   2. EC2 instance status
-║   3. Redis connection
-║   4. Database connection
-║
-║ 📍 Dashboard: http://127.0.0.1:8000/dashboard/index.html
-╚══════════════════════════════════════════════════════════════╝
+NEUROOPS ANALYZER CRASHED
+The metrics analyzer has failed {max_consecutive_failures} times consecutively.
+Manual intervention required.
+
+Please check:
+1. AWS credentials
+2. EC2 instance status
+3. Redis connection
+4. Database connection
+
+Dashboard: http://127.0.0.1:8000/dashboard/index.html
 """
                     send_sns_alert(
-                        subject="🔴 NEUROOPS ANALYZER CRASHED",
+                        subject="NEUROOPS ANALYZER CRASHED",
                         message=crash_message
                     )
                 except:

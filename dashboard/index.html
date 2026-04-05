@@ -555,12 +555,27 @@
             border-radius: 8px;
             width: 100%;
             outline: none;
-            transition: border-color 0.2s;
+            transition: all 0.2s ease;
             box-sizing: border-box;
         }
 
         input:focus, select:focus, textarea:focus { border-color: var(--border2); }
         textarea { height: 72px; resize: vertical; }
+
+        .input-auto {
+            background: var(--bg3) !important;
+            border-color: var(--border) !important;
+            color: var(--text2) !important;
+            font-style: italic;
+        }
+
+        .input-user {
+            background: var(--bg2) !important;
+            border-color: var(--cyan) !important;
+            color: var(--text) !important;
+            font-weight: 500;
+            border-width: 2px;
+        }
 
         .input-row {
             display: flex;
@@ -699,6 +714,46 @@
             color: var(--green);
         }
 
+        .auto-stats {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+        .auto-stats-title {
+            color: var(--cyan);
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .auto-stats-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .auto-stats-row:last-child {
+            border-bottom: none;
+        }
+        .auto-stats-label {
+            color: var(--text2);
+        }
+        .auto-stats-value {
+            color: var(--green);
+            font-weight: bold;
+        }
+        .auto-stats-value.critical {
+            color: var(--red);
+        }
+        .auto-stats-value.warning {
+            color: var(--yellow);
+        }
+
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -818,6 +873,7 @@
         <button class="tab" onclick="switchTab('builddeploy')" data-tab="builddeploy"><span class="dot"></span>build/deploy</button>
         <button class="tab" onclick="switchTab('mlops')" data-tab="mlops"><span class="dot"></span>mlops</button>
         <button class="tab" onclick="switchTab('aws')" data-tab="aws"><span class="dot"></span>AWS</button>
+        <button class="tab" onclick="switchTab('services')" data-tab="services"><span class="dot"></span>services</button>
     </div>
     <div class="header-right">
         <div class="notification-bell" id="notificationBell">
@@ -938,12 +994,33 @@
                 <div class="response-box loading" id="fail-result">waiting...</div>
             </div>
             <div class="panel">
-                <div class="panel-title">rul countdown <span class="badge">regressor (24 sensors)</span></div>
-                <p style="font-size:12px; color:var(--text3); margin-bottom:12px">⚠️ Uses 24 sensors from turbofan model. Only CPU, Status, Reboots, Age are real; others are defaults.</p>
+                <div class="panel-title">rul countdown <span class="badge">regressor</span></div>
+                <p style="font-size:12px; color:var(--text3); margin-bottom:12px">✅ Uses REAL EC2 metrics: CPU, Status, Reboots, Age</p>
                 <button class="btn btn-primary" onclick="runCountdown()">get countdown</button>
                 <div class="response-box loading" id="countdown-result">waiting...</div>
             </div>
         </div>
+        
+        <div class="panel">
+            <div class="panel-title">🔄 LIVE AUTO-REFRESH <span class="badge">updates every 30s</span></div>
+            <div id="auto-stats-container">
+                <div class="auto-stats">
+                    <div class="auto-stats-title">📊 FAILURE PREDICTION (Auto)</div>
+                    <div id="auto-failure-result" class="auto-stats-row">
+                        <span class="auto-stats-label">Loading...</span>
+                        <span class="auto-stats-value">-</span>
+                    </div>
+                </div>
+                <div class="auto-stats" style="margin-top: 12px;">
+                    <div class="auto-stats-title">🔮 RUL PREDICTION (Auto)</div>
+                    <div id="auto-rul-result" class="auto-stats-row">
+                        <span class="auto-stats-label">Loading...</span>
+                        <span class="auto-stats-value">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="grid-2">
             <div class="panel"><div class="panel-title">a/b model test <span class="badge">rf vs gb</span></div><button class="btn btn-primary" onclick="runABTest()">run a/b test</button><div class="response-box loading" id="ab-result">waiting...</div></div>
             <div class="panel"><div class="panel-title">multi-service correlation <span class="badge">4 services</span></div><button class="btn btn-primary" onclick="runCorrelate()">run correlation</button><div class="response-box loading" id="correlate-result">waiting...</div></div>
@@ -1037,6 +1114,29 @@
             <div class="card"><h3>Send SNS Alert</h3><label>Subject</label><input id="aws-sns-subject" type="text" placeholder="CRITICAL: Anomaly detected" /><label>Message</label><textarea id="aws-sns-message" rows="3" placeholder="Service showing CPU spike..."></textarea><button onclick="sendSNSAlert()">Send Alert</button><div id="aws-sns-result" class="result-box"></div></div>
         </div>
     </div>
+
+    <div class="tab-panel" id="tab-services">
+        <div class="panel">
+            <div class="panel-title">⚙️ Service Configuration <span class="badge">Business Impact</span></div>
+            <p style="font-size:12px; color:var(--text3); margin-bottom:16px">Set business impact (1-100) for each service. Higher impact = higher priority alerts.</p>
+            
+            <div style="background: var(--bg3); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin-bottom: 12px; color: var(--cyan);">➕ Add New Service</h4>
+                <div class="input-row">
+                    <div class="input-group"><label class="input-label">Service Name</label><input type="text" id="new-service-name" placeholder="e.g., payment-service"></div>
+                    <div class="input-group"><label class="input-label">Business Impact (1-100)</label><input type="number" id="new-service-impact" value="10" min="1" max="100"></div>
+                    <div class="input-group"><label class="input-label">SLA Minutes</label><input type="number" id="new-service-sla" value="5" min="1"></div>
+                    <div class="input-group"><label class="input-label">On-Call Group</label><input type="text" id="new-service-group" value="default" placeholder="default"></div>
+                </div>
+                <button class="btn btn-primary" onclick="createService()" style="margin-top: 8px;">➕ Add Service</button>
+            </div>
+            
+            <h4 style="margin-bottom: 12px; color: var(--cyan);">📋 Configured Services</h4>
+            <div id="services-list">
+                <div class="response-box loading">Loading services...</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -1044,6 +1144,7 @@ const API = "http://127.0.0.1:8000/api/v1";
 const WS = "ws://127.0.0.1:8000/ws/stream";
 
 let authToken = localStorage.getItem('neuroops_token');
+let currentInstanceId = null;
 
 function showToast(message, severity = 'info', title = null) {
     const container = document.getElementById('toastContainer');
@@ -1210,7 +1311,7 @@ async function checkAuth() {
 
 async function checkAWSStatus() { try { const res = await fetch(`${API}/aws/status`); const data = await res.json(); document.getElementById("aws-status-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-status-result").textContent = `Error: ${e.message}`; } }
 async function fetchAWSMetrics() { const token = localStorage.getItem("neuroops_token"); const instance_id = document.getElementById("aws-instance-id").value; const minutes = parseInt(document.getElementById("aws-minutes").value); try { const res = await fetch(`${API}/aws/fetch-metrics`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ instance_id, minutes }) }); const data = await res.json(); document.getElementById("aws-metrics-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-metrics-result").textContent = `Error: ${e.message}`; } }
-async function listEC2Instances() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/instances`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-instances-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-instances-result").textContent = `Error: ${e.message}`; } }
+async function listEC2Instances() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/instances`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-instances-result").textContent = JSON.stringify(data, null, 2); if (data.instances && data.instances.length > 0) { currentInstanceId = data.instances[0].instance_id; } } catch(e) { document.getElementById("aws-instances-result").textContent = `Error: ${e.message}`; } }
 async function uploadModel() { const token = localStorage.getItem("neuroops_token"); const local_path = document.getElementById("aws-local-path").value; const s3_key = document.getElementById("aws-s3-key").value; try { const res = await fetch(`${API}/aws/upload-model`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ local_path, s3_key }) }); const data = await res.json(); document.getElementById("aws-upload-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-upload-result").textContent = `Error: ${e.message}`; } }
 async function listS3Models() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/list-models`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-s3-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-s3-result").textContent = `Error: ${e.message}`; } }
 async function sendSNSAlert() { const token = localStorage.getItem("neuroops_token"); const subject = document.getElementById("aws-sns-subject").value; const message = document.getElementById("aws-sns-message").value; try { const res = await fetch(`${API}/aws/notify`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ subject, message }) }); const data = await res.json(); document.getElementById("aws-sns-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-sns-result").textContent = `Error: ${e.message}`; } }
@@ -1221,24 +1322,154 @@ async function runOpsGPT() { setLoading("ops-result", "ai analyzing log..."); tr
 async function pollJob(jobId, boxId, interval = 2000) { const timer = setInterval(async () => { try { const data = await get(`${API}/opsgpt/result/${jobId}`); if (data.status === "completed") { clearInterval(timer); setBox(boxId, data.result); } else if (data.status === "failed") { clearInterval(timer); setBox(boxId, data, "error"); } } catch(e) { clearInterval(timer); setBox(boxId, e.message, "error"); } }, interval); }
 async function runClusters() { setLoading("cluster-result"); try { const n = parseInt(document.getElementById("n-clusters").value); const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n }); const summary = data.clusters.map(c => `cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  keywords: ${c.top_keywords.join(", ")}`).join("\n\n"); setBox("cluster-result", `total logs: ${data.total_logs_analyzed} | clusters: ${data.n_clusters}\n\n${summary}`); } catch(e) { setBox("cluster-result", e.message, "error"); } }
 
+function markUserModified(element) {
+    element.classList.remove('input-auto');
+    element.classList.add('input-user');
+    const inputId = element.id;
+    localStorage.setItem(`user_modified_${inputId}`, 'true');
+}
+
+function setAutoValue(element, value) {
+    if (!element) return;
+    const inputId = element.id;
+    const wasUserModified = localStorage.getItem(`user_modified_${inputId}`);
+    if (!wasUserModified) {
+        element.classList.add('input-auto');
+        element.classList.remove('input-user');
+        element.value = value;
+    }
+}
+
+function initAutoStyles() {
+    const inputs = document.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('focus', () => markUserModified(input));
+        input.addEventListener('change', () => markUserModified(input));
+        input.addEventListener('input', () => markUserModified(input));
+        input.classList.add('input-auto');
+    });
+}
+
 function getSensorPayload(unitId) { 
     return { 
         unit_id: unitId, 
-        sensor1: parseFloat(document.getElementById("sensor1").value), 
-        sensor2: parseFloat(document.getElementById("sensor2").value), 
-        sensor3: parseFloat(document.getElementById("sensor3").value), 
-        sensor4: parseFloat(document.getElementById("sensor4").value), 
-        sensor5: 14.62, sensor6: 21.61, sensor7: 553.69, sensor8: 2388.09,
-        sensor9: 9050.17, sensor10: 1.3, sensor11: 47.28, sensor12: 521.72,
-        sensor13: 2388.09, sensor14: 8138.62, sensor15: 8.42, sensor16: 0.03,
-        sensor17: 392.0, sensor18: 2388.0, sensor19: 100.0, sensor20: 38.86,
-        sensor21: 23.36, sensor22: 0.0, sensor23: 0.0, sensor24: 0.0 
+        cpu: parseFloat(document.getElementById("sensor1").value),
+        status_check: parseFloat(document.getElementById("sensor2").value),
+        recent_reboots: parseFloat(document.getElementById("sensor3").value),
+        instance_age: parseFloat(document.getElementById("sensor4").value)
     }; 
 }
 
-async function runFailure() { setLoading("fail-result"); try { const data = await post(`${API}/failure/predict`, getSensorPayload(document.getElementById("unit-id").value)); setBox("fail-result", data, data.will_fail_soon ? "error" : ""); showToast(`Failure probability: ${data.failure_prob}`, data.risk_level.toLowerCase(), `⚠️ FAILURE PREDICTION`); } catch(e) { setBox("fail-result", e.message, "error"); } }
-async function runCountdown() { setLoading("countdown-result"); try { const data = await post(`${API}/failure/countdown`, getSensorPayload("engine_007")); setBox("countdown-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("countdown-result", e.message, "error"); } }
-async function runABTest() { setLoading("ab-result"); try { const data = await post(`${API}/failure/ab-test`, getSensorPayload("engine_007")); setBox("ab-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("ab-result", e.message, "error"); } }
+async function runFailure() { 
+    setLoading("fail-result"); 
+    try { 
+        const payload = getSensorPayload(document.getElementById("unit-id").value);
+        const data = await post(`${API}/failure/predict`, {
+            cpu_usage: payload.cpu,
+            status_check_ok: payload.status_check === 1,
+            recent_reboots: payload.recent_reboots,
+            instance_age_days: payload.instance_age
+        });
+        setBox("fail-result", data, data.will_fail_soon ? "error" : ""); 
+        showToast(`Failure probability: ${data.failure_probability}`, data.risk_level.toLowerCase(), `⚠️ FAILURE PREDICTION`); 
+        updateAutoFailureStats(data);
+    } catch(e) { 
+        setBox("fail-result", e.message, "error"); 
+    } 
+}
+
+async function runCountdown() { 
+    setLoading("countdown-result"); 
+    try { 
+        const payload = getSensorPayload(document.getElementById("unit-id").value);
+        const data = await post(`${API}/failure/countdown`, {
+            cpu_usage: payload.cpu,
+            status_check_ok: payload.status_check === 1,
+            recent_reboots: payload.recent_reboots,
+            instance_age_days: payload.instance_age
+        });
+        setBox("countdown-result", data, data.urgency === "critical" ? "error" : ""); 
+        updateAutoRULStats(data);
+    } catch(e) { 
+        setBox("countdown-result", e.message, "error"); 
+    } 
+}
+
+async function autoFetchLatestPredictions() {
+    if (!currentInstanceId) {
+        try {
+            const token = localStorage.getItem('neuroops_token');
+            const res = await fetch(`${API}/aws/instances`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.instances && data.instances.length > 0) {
+                currentInstanceId = data.instances[0].instance_id;
+            } else {
+                return;
+            }
+        } catch(e) {
+            console.log('Auto-fetch: Could not get instance ID');
+            return;
+        }
+    }
+    
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        const failureRes = await fetch(`${API}/failure/latest/${currentInstanceId}`, { headers });
+        const failureData = await failureRes.json();
+        
+        if (failureData && !failureData.detail) {
+            updateAutoFailureStats(failureData);
+        }
+        
+        const rulRes = await fetch(`${API}/failure/rul-latest/${currentInstanceId}`, { headers });
+        const rulData = await rulRes.json();
+        
+        if (rulData && !rulData.detail) {
+            updateAutoRULStats(rulData);
+        }
+        
+    } catch(e) {
+        console.log('Auto-fetch failed:', e);
+    }
+}
+
+function updateAutoFailureStats(data) {
+    const container = document.getElementById('auto-failure-result');
+    if (!container) return;
+    const riskClass = data.risk_level === 'CRITICAL' ? 'critical' : (data.risk_level === 'WARNING' ? 'warning' : '');
+    container.innerHTML = `
+        <span class="auto-stats-label">Risk Level:</span>
+        <span class="auto-stats-value ${riskClass}">${data.risk_level || 'UNKNOWN'}</span>
+        <span class="auto-stats-label" style="margin-left: 16px;">Probability:</span>
+        <span class="auto-stats-value ${riskClass}">${data.failure_probability || 0}%</span>
+        <span class="auto-stats-label" style="margin-left: 16px;">Will Fail:</span>
+        <span class="auto-stats-value ${data.will_fail_soon ? 'critical' : ''}">${data.will_fail_soon ? '⚠️ YES' : '✅ NO'}</span>
+        <span class="auto-stats-label" style="margin-left: 16px;">Action:</span>
+        <span class="auto-stats-value">${data.action || 'None'}</span>
+    `;
+}
+
+function updateAutoRULStats(data) {
+    const container = document.getElementById('auto-rul-result');
+    if (!container) return;
+    const urgencyClass = data.urgency === 'CRITICAL' ? 'critical' : (data.urgency === 'WARNING' ? 'warning' : '');
+    container.innerHTML = `
+        <span class="auto-stats-label">Cycles Left:</span>
+        <span class="auto-stats-value ${urgencyClass}">${data.cycles_remaining || 'N/A'}</span>
+        <span class="auto-stats-label" style="margin-left: 16px;">Hours Left:</span>
+        <span class="auto-stats-value ${urgencyClass}">${data.hours_remaining || 'N/A'}</span>
+        <span class="auto-stats-label" style="margin-left: 16px;">Urgency:</span>
+        <span class="auto-stats-value ${urgencyClass}">${data.urgency || 'UNKNOWN'}</span>
+        <span class="auto-stats-label" style="margin-left: 16px;">Confidence:</span>
+        <span class="auto-stats-value">${data.confidence_pct || 80}%</span>
+    `;
+}
+
+async function runABTest() { setLoading("ab-result"); try { const payload = getSensorPayload("engine_007"); const data = await post(`${API}/failure/ab-test`, { cpu_usage: payload.cpu, status_check_ok: payload.status_check === 1, recent_reboots: payload.recent_reboots, instance_age_days: payload.instance_age }); setBox("ab-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("ab-result", e.message, "error"); } }
 async function runCorrelate() { setLoading("correlate-result"); try { const servicesList = [{ service_name: "engine_api", sensors: [] }, { service_name: "payment_service", sensors: [] }, { service_name: "auth_service", sensors: [] }, { service_name: "cache_layer", sensors: [] }]; const data = await post(`${API}/failure/correlate`, { services: servicesList }); setBox("correlate-result", data, data.is_correlated_failure ? "error" : ""); } catch(e) { setBox("correlate-result", e.message, "error"); } }
 async function runScaleWise() { setLoading("sw-result"); try { const data = await post(`${API}/scalewise/analyze`, { instance_type: document.getElementById("instance-type").value, cpu_usage: parseFloat(document.getElementById("cpu-usage").value), ram_usage: parseFloat(document.getElementById("ram-usage").value), hours_running: 730 }); setBox("sw-result", data); } catch(e) { setBox("sw-result", e.message, "error"); } }
 async function runPricing() { setLoading("pricing-result"); try { const data = await get(`${API}/scalewise/pricing`); setBox("pricing-result", data); } catch(e) { setBox("pricing-result", e.message, "error"); } }
@@ -1300,17 +1531,14 @@ function updateHealthStat(severity) {
 function updateServiceGrid(services) { 
     const grid = document.getElementById("service-grid");
     if (!grid) return;
-    
     if (!services || services.length === 0) {
         grid.innerHTML = '<div class="response-box">No active services</div>';
         return;
     }
-    
     grid.innerHTML = services.map(s => {
         const cpuDisplay = s.cpu !== undefined ? `${s.cpu}%` : 'N/A';
         const memoryDisplay = s.memory !== undefined ? `${s.memory}%` : 'N/A';
         const diskDisplay = s.disk !== undefined ? `${s.disk}%` : 'N/A';
-        
         return `
             <div class="alert-item ${s.severity || 'normal'}">
                 <div class="alert-dot ${s.severity || 'normal'}"></div>
@@ -1332,61 +1560,52 @@ function connectWS() {
     if (window.ws && window.ws.readyState === WebSocket.OPEN) {
         return;
     }
-    
     window.ws = new WebSocket(WS);
-    
     window.ws.onopen = () => { 
         document.getElementById("live-badge").textContent = "● live"; 
         document.getElementById("live-badge").style.color = "#00ff88";
     };
-    
     window.ws.onmessage = (e) => {
-    try {
-        const data = JSON.parse(e.data);
-        if (data.type === "metric_stream") {
-            const s = data.summary;
-            const anomaliesEl = document.getElementById("stat-anomalies");
-            if (anomaliesEl) anomaliesEl.textContent = s.anomalies;
-            updateHealthStat(s.critical > 0 ? "critical" : s.anomalies > 0 ? "warning" : "normal");
-            
-            if (data.services && data.services.length > 0) {
-                pushChart(anomalyChart, data.services[0].anomaly_score || 0.1, data.services[0].is_anomaly || false);
-                
-                const formattedServices = data.services.map(svc => ({
-                    service: svc.service,
-                    severity: svc.severity || "normal",
-                    cpu: svc.cpu !== undefined ? svc.cpu : (svc.value !== undefined ? svc.value : 0),
-                    memory: svc.memory !== undefined ? svc.memory : 0,
-                    disk: svc.disk !== undefined ? svc.disk : 0,
-                    failure_probability: svc.failure_probability || 0,
-                    rul_cycles: svc.rul_cycles || 0,
-                    is_anomaly: svc.is_anomaly || false,
-                    anomaly_score: svc.anomaly_score || 0
-                }));
-                updateServiceGrid(formattedServices);
-                
-                data.services.filter(sv => sv.is_anomaly).forEach(sv => {
-                    const cpuVal = sv.cpu !== undefined ? sv.cpu : sv.value;
-                    addAlert({ severity: sv.severity, message: `${sv.service} — CPU ${cpuVal}%` });
-                    showToast(`${sv.service} CPU at ${cpuVal}%`, sv.severity, `🚨 ANOMALY DETECTED`);
-                });
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === "metric_stream") {
+                const s = data.summary;
+                const anomaliesEl = document.getElementById("stat-anomalies");
+                if (anomaliesEl) anomaliesEl.textContent = s.anomalies;
+                updateHealthStat(s.critical > 0 ? "critical" : s.anomalies > 0 ? "warning" : "normal");
+                if (data.services && data.services.length > 0) {
+                    pushChart(anomalyChart, data.services[0].anomaly_score || 0.1, data.services[0].is_anomaly || false);
+                    const formattedServices = data.services.map(svc => ({
+                        service: svc.service,
+                        severity: svc.severity || "normal",
+                        cpu: svc.cpu !== undefined ? svc.cpu : (svc.value !== undefined ? svc.value : 0),
+                        memory: svc.memory !== undefined ? svc.memory : 0,
+                        disk: svc.disk !== undefined ? svc.disk : 0,
+                        failure_probability: svc.failure_probability || 0,
+                        rul_cycles: svc.rul_cycles || 0,
+                        is_anomaly: svc.is_anomaly || false,
+                        anomaly_score: svc.anomaly_score || 0
+                    }));
+                    updateServiceGrid(formattedServices);
+                    data.services.filter(sv => sv.is_anomaly).forEach(sv => {
+                        const cpuVal = sv.cpu !== undefined ? sv.cpu : sv.value;
+                        addAlert({ severity: sv.severity, message: `${sv.service} — CPU ${cpuVal}%` });
+                        showToast(`${sv.service} CPU at ${cpuVal}%`, sv.severity, `🚨 ANOMALY DETECTED`);
+                    });
+                }
+                if (s.critical > 0) {
+                    showToast(`${s.critical} critical anomalies detected`, 'critical', '⚠️ MULTIPLE ANOMALIES');
+                }
             }
-            
-            if (s.critical > 0) {
-                showToast(`${s.critical} critical anomalies detected`, 'critical', '⚠️ MULTIPLE ANOMALIES');
-            }
+        } catch(err) {
+            console.log('WebSocket message error:', err);
         }
-    } catch(err) {
-        console.log('WebSocket message error:', err);
-    }
-};
-    
+    };
     window.ws.onclose = () => { 
         document.getElementById("live-badge").textContent = "● reconnecting"; 
         document.getElementById("live-badge").style.color = "#ffaa00"; 
         setTimeout(connectWS, 3000); 
     };
-    
     window.ws.onerror = (err) => {
         console.log('WebSocket error:', err);
     };
@@ -1400,6 +1619,7 @@ async function loadRealMetrics() {
         const instancesData = await instancesRes.json();
         if (instancesData.instances && instancesData.instances.length > 0) {
             const instance = instancesData.instances[0];
+            if (!currentInstanceId) currentInstanceId = instance.instance_id;
             const metricsRes = await fetch(`${API}/aws/latest-metrics/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const metrics = await metricsRes.json();
             if (metrics.cpu_percent) {
@@ -1440,33 +1660,22 @@ async function autoPopulateInputs() {
     try {
         const token = localStorage.getItem('neuroops_token');
         if (!token) return;
-        
-        const instancesRes = await fetch(`${API}/aws/instances`, { 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
         const instancesData = await instancesRes.json();
-        
         if (instancesData.instances && instancesData.instances.length > 0) {
             const instance = instancesData.instances[0];
             const instanceId = instance.instance_id;
-            
-            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instanceId}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            if (!currentInstanceId) currentInstanceId = instanceId;
+            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instanceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const metrics = await metricsRes.json();
-            
             if (metrics && metrics.cpu_percent !== null) {
                 const cpuValue = parseFloat(metrics.cpu_percent).toFixed(1);
-                
                 const metricValueInput = document.getElementById('metric-value');
-                if (metricValueInput) metricValueInput.value = cpuValue;
-                
+                if (metricValueInput) setAutoValue(metricValueInput, cpuValue);
                 const failureCpuInput = document.getElementById('sensor1');
-                if (failureCpuInput) failureCpuInput.value = cpuValue;
-                
+                if (failureCpuInput) setAutoValue(failureCpuInput, cpuValue);
                 const unitIdInput = document.getElementById('unit-id');
-                if (unitIdInput) unitIdInput.value = instanceId;
-                
+                if (unitIdInput) setAutoValue(unitIdInput, instanceId);
                 console.log(`Auto-populated CPU: ${cpuValue}%`);
             }
         }
@@ -1479,19 +1688,12 @@ async function loadLatestFailurePrediction() {
     try {
         const token = localStorage.getItem('neuroops_token');
         if (!token) return;
-        
-        const instancesRes = await fetch(`${API}/aws/instances`, { 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
         const instancesData = await instancesRes.json();
-        
         if (instancesData.instances && instancesData.instances.length > 0) {
             const instance = instancesData.instances[0];
-            const predRes = await fetch(`${API}/failure/latest/${instance.instance_id}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            const predRes = await fetch(`${API}/failure/latest/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const prediction = await predRes.json();
-            
             if (prediction && prediction.failure_probability !== undefined) {
                 const failResultBox = document.getElementById('fail-result');
                 if (failResultBox && failResultBox.classList.contains('loading')) {
@@ -1506,6 +1708,7 @@ async function loadLatestFailurePrediction() {
                     `;
                     setBox("fail-result", resultHtml, prediction.risk_level === "CRITICAL" ? "error" : "");
                 }
+                updateAutoFailureStats(prediction);
             }
         }
     } catch(e) {
@@ -1517,57 +1720,39 @@ async function autoPopulateFailure() {
     try {
         const token = localStorage.getItem('neuroops_token');
         if (!token) return;
-        
-        const instancesRes = await fetch(`${API}/aws/instances`, { 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
         const instancesData = await instancesRes.json();
-        
         if (instancesData.instances && instancesData.instances.length > 0) {
             const instance = instancesData.instances[0];
             const instanceId = instance.instance_id;
-            
-            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instanceId}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            if (!currentInstanceId) currentInstanceId = instanceId;
+            const metricsRes = await fetch(`${API}/aws/latest-metrics/${instanceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const metrics = await metricsRes.json();
-            
-            const statusRes = await fetch(`${API}/aws/instance-status/${instanceId}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            const statusRes = await fetch(`${API}/aws/instance-status/${instanceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const statusData = await statusRes.json();
-            
-            const rebootRes = await fetch(`${API}/aws/reboot-count/${instanceId}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            const rebootRes = await fetch(`${API}/aws/reboot-count/${instanceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const rebootData = await rebootRes.json();
-            
             const unitIdInput = document.getElementById('unit-id');
-            if (unitIdInput) unitIdInput.value = instanceId;
-            
+            if (unitIdInput) setAutoValue(unitIdInput, instanceId);
             const cpuInput = document.getElementById('sensor1');
             if (cpuInput && metrics.cpu_percent !== undefined) {
-                cpuInput.value = parseFloat(metrics.cpu_percent).toFixed(1);
+                setAutoValue(cpuInput, parseFloat(metrics.cpu_percent).toFixed(1));
             }
-            
             const statusSelect = document.getElementById('sensor2');
             if (statusSelect && statusData.is_healthy !== undefined) {
-                statusSelect.value = statusData.is_healthy ? '1' : '0';
+                setAutoValue(statusSelect, statusData.is_healthy ? '1' : '0');
             }
-            
             const rebootInput = document.getElementById('sensor3');
             if (rebootInput && rebootData.count !== undefined) {
-                rebootInput.value = rebootData.count;
+                setAutoValue(rebootInput, rebootData.count);
             }
-            
             const ageInput = document.getElementById('sensor4');
             if (ageInput && instance.launch_time) {
                 const launchDate = new Date(instance.launch_time);
                 const now = new Date();
                 const ageDays = Math.floor((now - launchDate) / (1000 * 60 * 60 * 24));
-                ageInput.value = ageDays;
+                setAutoValue(ageInput, ageDays);
             }
-            
             console.log('Failure tab auto-populated');
         }
     } catch(e) {
@@ -1579,19 +1764,12 @@ async function loadLatestRULPrediction() {
     try {
         const token = localStorage.getItem('neuroops_token');
         if (!token) return;
-        
-        const instancesRes = await fetch(`${API}/aws/instances`, { 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
         const instancesData = await instancesRes.json();
-        
         if (instancesData.instances && instancesData.instances.length > 0) {
             const instance = instancesData.instances[0];
-            const predRes = await fetch(`${API}/failure/rul-latest/${instance.instance_id}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            const predRes = await fetch(`${API}/failure/rul-latest/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const prediction = await predRes.json();
-            
             if (prediction && prediction.cycles_remaining !== undefined) {
                 const rulBox = document.getElementById('countdown-result');
                 if (rulBox && rulBox.classList.contains('loading')) {
@@ -1606,6 +1784,7 @@ async function loadLatestRULPrediction() {
                     `;
                     setBox("countdown-result", resultHtml, prediction.urgency === "CRITICAL" ? "error" : "");
                 }
+                updateAutoRULStats(prediction);
             }
         }
     } catch(e) {
@@ -1617,15 +1796,12 @@ async function loadServiceDropdowns() {
     try {
         const token = localStorage.getItem('neuroops_token');
         if (!token) return;
-        
         const response = await fetch(`${API}/autohealing/services`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
-        
         if (data.services && data.services.length > 0) {
             const serviceSelectHtml = data.services.map(s => `<option value="${s}">${s}</option>`).join('');
-            
             const healServiceInput = document.getElementById('heal-service');
             if (healServiceInput && healServiceInput.tagName === 'INPUT') {
                 const parent = healServiceInput.parentNode;
@@ -1635,7 +1811,6 @@ async function loadServiceDropdowns() {
                 select.innerHTML = serviceSelectHtml;
                 parent.replaceChild(select, healServiceInput);
             }
-            
             const pipeServiceInput = document.getElementById('pipe-service');
             if (pipeServiceInput && pipeServiceInput.tagName === 'INPUT') {
                 const parent = pipeServiceInput.parentNode;
@@ -1645,7 +1820,6 @@ async function loadServiceDropdowns() {
                 select.innerHTML = serviceSelectHtml;
                 parent.replaceChild(select, pipeServiceInput);
             }
-            
             const buildServiceInput = document.getElementById('build-service');
             if (buildServiceInput && buildServiceInput.tagName === 'INPUT') {
                 const parent = buildServiceInput.parentNode;
@@ -1655,7 +1829,6 @@ async function loadServiceDropdowns() {
                 select.innerHTML = serviceSelectHtml;
                 parent.replaceChild(select, buildServiceInput);
             }
-            
             const deployServiceInput = document.getElementById('deploy-service');
             if (deployServiceInput && deployServiceInput.tagName === 'INPUT') {
                 const parent = deployServiceInput.parentNode;
@@ -1665,12 +1838,203 @@ async function loadServiceDropdowns() {
                 select.innerHTML = serviceSelectHtml;
                 parent.replaceChild(select, deployServiceInput);
             }
-            
             console.log(`Loaded ${data.services.length} services for dropdowns from ${data.source}`);
         }
     } catch(e) {
         console.log('Failed to load service dropdowns:', e);
     }
+}
+
+// ========== SERVICES CONFIGURATION (Business Impact) ==========
+
+async function loadServices() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const response = await fetch(`${API}/services`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const services = await response.json();
+        
+        const container = document.getElementById('services-list');
+        if (!services.length) {
+            container.innerHTML = '<div class="response-box">No services configured. Add one above.</div>';
+            return;
+        }
+        
+        let html = `<div style="overflow-x: auto;">`;
+        html += `<table class="healing-table" style="width:100%">`;
+        html += `<tr><th>Service Name</th><th>Business Impact</th><th>SLA (min)</th><th>On-Call Group</th><th>Actions</th></tr>`;
+        
+        for (const service of services) {
+            const impactColor = service.business_impact >= 80 ? 'var(--red)' : 
+                               service.business_impact >= 50 ? 'var(--yellow)' : 'var(--green)';
+            
+            html += `
+                <tr>
+                    <td><strong>${escapeHtml(service.service_name)}</strong></td>
+                    <td>
+                        <input type="range" min="1" max="100" value="${service.business_impact}" 
+                               onchange="updateServiceImpact(${service.id}, this.value)" 
+                               style="width:100px; vertical-align:middle;">
+                        <span style="color:${impactColor}; margin-left:8px; font-weight:bold;">${service.business_impact}</span>
+                    </td>
+                    <td>
+                        <input type="number" value="${service.sla_minutes}" 
+                               onchange="updateServiceSLA(${service.id}, this.value)"
+                               style="width:70px;" min="1">
+                    </td>
+                    <td>
+                        <input type="text" value="${escapeHtml(service.on_call_group)}" 
+                               onchange="updateServiceGroup(${service.id}, this.value)"
+                               style="width:120px;">
+                    </td>
+                    <td>
+                        <button class="btn-danger btn-sm" onclick="deleteService(${service.id}, '${escapeHtml(service.service_name)}')" 
+                                style="padding:4px 12px;">🗑️ Delete</button>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        html += `</table></div>`;
+        container.innerHTML = html;
+        
+    } catch(e) {
+        document.getElementById('services-list').innerHTML = `<div class="response-box error">Failed to load services: ${e.message}</div>`;
+    }
+}
+
+async function createService() {
+    const name = document.getElementById('new-service-name').value.trim();
+    const impact = parseInt(document.getElementById('new-service-impact').value);
+    const sla = parseInt(document.getElementById('new-service-sla').value);
+    const group = document.getElementById('new-service-group').value.trim();
+    
+    if (!name) {
+        showToast("Service name required", "warning");
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        const response = await fetch(`${API}/services`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                service_name: name,
+                business_impact: impact,
+                sla_minutes: sla,
+                on_call_group: group || "default"
+            })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            showToast(`Service "${name}" created with impact ${impact}`, "success");
+            document.getElementById('new-service-name').value = '';
+            document.getElementById('new-service-impact').value = '10';
+            document.getElementById('new-service-sla').value = '5';
+            document.getElementById('new-service-group').value = 'default';
+            loadServices();
+        } else {
+            showToast(data.detail || "Failed to create service", "error");
+        }
+    } catch(e) {
+        showToast(`Error: ${e.message}`, "error");
+    }
+}
+
+async function updateServiceImpact(serviceId, impact) {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        const response = await fetch(`${API}/services/${serviceId}`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ business_impact: parseInt(impact) })
+        });
+        
+        if (response.ok) {
+            showToast(`Business impact updated to ${impact}`, "info");
+            loadServices();
+        } else {
+            showToast("Failed to update impact", "error");
+        }
+    } catch(e) {
+        showToast(`Error: ${e.message}`, "error");
+    }
+}
+
+async function updateServiceSLA(serviceId, sla) {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        await fetch(`${API}/services/${serviceId}`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ sla_minutes: parseInt(sla) })
+        });
+        showToast(`SLA updated to ${sla} minutes`, "info");
+    } catch(e) {
+        showToast(`Error: ${e.message}`, "error");
+    }
+}
+
+async function updateServiceGroup(serviceId, group) {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        await fetch(`${API}/services/${serviceId}`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ on_call_group: group })
+        });
+        showToast(`On-call group updated to "${group}"`, "info");
+    } catch(e) {
+        showToast(`Error: ${e.message}`, "error");
+    }
+}
+
+async function deleteService(serviceId, serviceName) {
+    if (!confirm(`Delete service "${serviceName}"? This will reset its business impact to default (10).`)) return;
+    
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        const response = await fetch(`${API}/services/${serviceId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            showToast(`Service "${serviceName}" deleted`, "info");
+            loadServices();
+        } else {
+            showToast("Failed to delete service", "error");
+        }
+    } catch(e) {
+        showToast(`Error: ${e.message}`, "error");
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
 
 let notifications = [];
@@ -1692,18 +2056,12 @@ async function loadCapacityPlan() {
     setLoading("capacity-result");
     try {
         const token = localStorage.getItem('neuroops_token');
-        const instancesRes = await fetch(`${API}/aws/instances`, { 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
         const instancesData = await instancesRes.json();
-        
         if (instancesData.instances && instancesData.instances.length > 0) {
             const instance = instancesData.instances[0];
-            const res = await fetch(`${API}/scalewise/capacity/${instance.instance_id}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            const res = await fetch(`${API}/scalewise/capacity/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
-            
             let html = `📊 CAPACITY PLAN\n`;
             html += `Instance: ${data.instance_id}\n`;
             html += `\nCPU: ${data.cpu.current_avg}% avg, growth ${data.cpu.growth_rate_per_day}%/day\n`;
@@ -1715,7 +2073,6 @@ async function loadCapacityPlan() {
                 html += `⚠️ Memory will reach 90% in ${data.memory.days_until_90_percent} days\n`;
             }
             html += `\n💡 Recommendation: ${data.instance_need.recommendation}`;
-            
             setBox("capacity-result", html);
         }
     } catch(e) {
@@ -1730,10 +2087,8 @@ async function loadCostSavings() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
-        
         const savingsEl = document.getElementById('savings-amount');
         const recEl = document.getElementById('savings-recommendation');
-        
         if (savingsEl) {
             savingsEl.textContent = `$${data.savings}`;
         }
@@ -1758,18 +2113,15 @@ function updateNotificationBell() {
     const unread = notifications.filter(n => !n.read).length;
     if (unread > 0) { badge.textContent = unread > 99 ? '99+' : unread; badge.style.display = 'block'; } 
     else { badge.style.display = 'none'; }
-    
     if (notifications.length === 0) { 
         list.innerHTML = '<div class="notification-empty">No recent incidents</div>'; 
         return; 
     }
-    
     list.innerHTML = notifications.map(n => {
         const autoHealed = n.resolution ? true : false;
         const notifiedOnCall = n.notified || false;
         const shortRootCause = n.root_cause ? n.root_cause.substring(0, 100) : 'No root cause analysis available';
         const fullRootCause = n.root_cause || 'No root cause analysis available';
-        
         return `
             <div class="notification-item ${n.read ? '' : 'unread'}" onclick="markIncidentRead(${n.id})">
                 <div class="notification-title">${n.title || 'Incident'}</div>
@@ -1799,24 +2151,65 @@ function markIncidentRead(incidentId) {
 function addAlert(data) { 
     const feed = document.getElementById("alert-feed"); 
     if (feed.querySelector(".loading")) feed.innerHTML = ""; 
-    const sev = data.severity || "normal"; 
+    const sev = data.severity || "normal";
+    const priority = data.priority_score || 0;
+    
+    // Priority badge
+    let priorityBadge = '';
+    if (priority >= 80) priorityBadge = '<span class="tag" style="background:rgba(255,68,85,0.3); color:#ff4455; margin-right:8px;">🔥 PRIORITY 1</span>';
+    else if (priority >= 50) priorityBadge = '<span class="tag" style="background:rgba(255,170,0,0.3); color:#ffaa00; margin-right:8px;">⚠️ PRIORITY 2</span>';
+    else if (priority >= 30) priorityBadge = '<span class="tag" style="background:rgba(0,212,255,0.3); color:#00d4ff; margin-right:8px;">📌 PRIORITY 3</span>';
+    
     const item = document.createElement("div"); 
     item.className = `alert-item ${sev}`; 
-    item.innerHTML = `<div class="alert-dot ${sev}"></div><div style="flex:1;font-size:13px">${data.message || "metric analyzed"}</div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${new Date().toLocaleTimeString()}</span><span class="tag ${sev}" style="margin-left:8px">${sev.toUpperCase()}</span>`; 
+    item.innerHTML = `
+        <div class="alert-dot ${sev}"></div>
+        <div style="flex:1;font-size:13px">
+            ${priorityBadge}
+            ${data.message || "metric analyzed"}
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${new Date().toLocaleTimeString()}</span>
+        <span class="tag ${sev}" style="margin-left:8px">${sev.toUpperCase()}</span>
+    `; 
     feed.insertBefore(item, feed.firstChild); 
     if (feed.children.length > 20) feed.removeChild(feed.lastChild); 
 }
 
-function loadAlerts() { 
-    const feed = document.getElementById("alert-feed"); 
-    feed.innerHTML = ""; 
-    [{severity:"critical", message:"ec2_cpu spike detected"},{severity:"warning",message:"memory above threshold"},{severity:"normal",message:"health check passed"}].forEach(a => addAlert(a)); 
+function loadAlerts() {
+    loadPrioritizedAlerts();
+}
+
+async function loadPrioritizedAlerts() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const response = await fetch(`${API}/inframind/alerts/priority`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.alerts && data.alerts.length) {
+            const feed = document.getElementById("alert-feed");
+            feed.innerHTML = "";
+            for (const alert of data.alerts) {
+                addAlert({
+                    severity: alert.severity,
+                    message: alert.message,
+                    priority_score: alert.priority_score
+                });
+            }
+        }
+    } catch(e) {
+        console.log('Failed to load prioritized alerts:', e);
+    }
 }
 
 async function init() {
     loadTheme();
     const isAuth = await checkAuth();
     if (isAuth) {
+        initAutoStyles();
         loadAlerts(); 
         connectWS();
         loadHistoricalScores(); 
@@ -1829,7 +2222,9 @@ async function init() {
         loadHealingTimeline();
         loadCostSavings();
         loadLatestRULPrediction();
+        loadServices();
         
+        setInterval(autoFetchLatestPredictions, 30000);
         setInterval(fetchIncidents, 30000);
         setInterval(updateModelHealth, 60000);
         setInterval(autoPopulateInputs, 20000);
@@ -1840,6 +2235,9 @@ async function init() {
         setInterval(loadCostSavings, 30000);
         setInterval(loadHealingTimeline, 60000);
         setInterval(loadServiceDropdowns, 60000);
+        setInterval(loadServices, 60000);
+        setInterval(loadPrioritizedAlerts, 30000); 
+        setTimeout(autoFetchLatestPredictions, 2000);
     }
 }
 
