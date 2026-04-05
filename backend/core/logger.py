@@ -20,7 +20,7 @@ def setup_logging():
         structlog.processors.UnicodeDecoder(),
     ]
     
-    if settings.LOG_FORMAT == "json":
+    if getattr(settings, 'LOG_FORMAT', 'json') == "json":
         # JSON format for production
         structlog.configure(
             processors=shared_processors + [
