@@ -1140,8 +1140,8 @@
 </div>
 
 <script>
-const API = "http://127.0.0.1:8000/api/v1";
-const WS = "ws://127.0.0.1:8000/ws/stream";
+const API = window.location.origin + "/api/v1";
+const WS = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/stream";
 
 let authToken = localStorage.getItem('neuroops_token');
 let currentInstanceId = null;

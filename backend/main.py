@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from backend.api import streaming
 from backend.api import incidents
 from backend.api import aws
 from backend.core.config import settings
@@ -16,10 +17,11 @@ import time
 from backend.api import agent
 from backend.api import rootcause
 from backend.api import services
+from backend.api import training
 # Routers
 from backend.api import (
     auth, inframind, opsgpt, failure, scalewise,
-    autohealing, buildsense, deployguard, streaming,
+    autohealing, buildsense, deployguard,
     features, registry, pipeline, health
 )
 
@@ -111,16 +113,17 @@ app.include_router(scalewise.router,    prefix="/api/v1", tags=["ScaleWise"])
 app.include_router(autohealing.router,  prefix="/api/v1", tags=["Auto-Healing"])
 app.include_router(buildsense.router,   prefix="/api/v1", tags=["BuildSense"])
 app.include_router(deployguard.router,  prefix="/api/v1", tags=["DeployGuard"])
-app.include_router(streaming.router,    tags=["Live Streaming"])
+app.include_router(streaming.router,    prefix="/api/v1", tags=["Live Streaming"])
 app.include_router(features.router,     prefix="/api/v1", tags=["Feature Store"])
 app.include_router(registry.router,     prefix="/api/v1", tags=["Model Registry"])
 app.include_router(pipeline.router,     prefix="/api/v1", tags=["Data Pipeline"])
-app.include_router(health.router,       tags=["Health"])
+app.include_router(health.router,       prefix="/api/v1", tags=["Health"])
 app.include_router(aws.router,          prefix="/api/v1", tags=["AWS"])
 app.include_router(incidents.router,    prefix="/api/v1", tags=["Incidents"])
-app.include_router(services.router, prefix="/api/v1", tags=["services"])
-app.include_router(rootcause.router, prefix="/api/v1", tags=["rootcause"])
-app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
+app.include_router(services.router,     prefix="/api/v1", tags=["Services"])
+app.include_router(rootcause.router,    prefix="/api/v1", tags=["RootCause"])
+app.include_router(agent.router,        prefix="/api/v1", tags=["Agent"])
+app.include_router(training.router,     prefix="/api/v1", tags=["Training"])
 
 
 def run_daily_clustering_background():

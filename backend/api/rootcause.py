@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/rootcause/timeline/{alert_id}")
 def get_root_cause_timeline(
     alert_id: int,
-    time_window: int = 30,
+    time_window_minutes: int = 30,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -26,7 +26,7 @@ def get_root_cause_timeline(
     - Healing actions after alert
     - Root cause conclusion
     """
-    result = get_timeline_for_alert(alert_id, db, time_window)
+    result = get_timeline_for_alert(alert_id, db, time_window_minutes)
     
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
@@ -49,7 +49,7 @@ def get_latest_root_cause(
         results = []
         for alert in alerts:
             try:
-                timeline = get_timeline_for_alert(alert.id, db, time_window=30)
+                timeline = get_timeline_for_alert(alert.id, db, time_window_minutes=30)
                 if "error" not in timeline:
                     results.append({
                         "alert_id": alert.id,
@@ -61,7 +61,6 @@ def get_latest_root_cause(
                         "confidence": timeline.get("confidence", 0)
                     })
                 else:
-                    # Still include alert even if timeline fails
                     results.append({
                         "alert_id": alert.id,
                         "alert_time": alert.created_at.isoformat(),
@@ -86,3 +85,26 @@ def get_latest_root_cause(
         
     except Exception as e:
         return {"error": str(e), "alerts": []}
+    
+@router.get("/rootcause/detailed/{alert_id}")
+def detailed_root_cause(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Detailed root cause analysis with timeline and recommendations"""
+    from backend.services.detailed_root_cause import DetailedRootCauseAnalyzer
+    analyzer = DetailedRootCauseAnalyzer()
+    result = analyzer.analyze(alert_id)
+    return result
+
+@router.get("/rootcause/hybrid/{alert_id}")
+def hybrid_root_cause(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from backend.services.hybrid_root_cause import HybridRootCauseAnalyzer
+    analyzer = HybridRootCauseAnalyzer()
+    result = analyzer.analyze(alert_id)
+    return result

@@ -3,17 +3,21 @@ import numpy as np
 import pandas as pd
 from threading import Lock
 
-# singleton explainer loaded once
 _explainer = None
 _explainer_lock = Lock()
 
 
 def load_explainer(model, scaler, background_data: pd.DataFrame):
-    """Load SHAP explainer once at startup (singleton)"""
     global _explainer
     
     with _explainer_lock:
         if _explainer is None:
+            n_features = scaler.n_features_in_ if hasattr(scaler, 'n_features_in_') else background_data.shape[1]
+            print(f"Explainer: scaler expects {n_features} features")
+            
+            if background_data.shape[1] > n_features:
+                background_data = background_data.iloc[:, :n_features]
+            
             X_scaled = scaler.transform(background_data)
             _explainer = shap.TreeExplainer(model)
     
@@ -21,29 +25,32 @@ def load_explainer(model, scaler, background_data: pd.DataFrame):
 
 
 def get_explainer():
-    """Get the singleton explainer instance"""
     return _explainer
 
 
 def explain_prediction(model, scaler, input_features: dict) -> dict:
-    """Takes a single prediction input and returns feature contributions"""
     global _explainer
 
     if _explainer is None:
         return {"error": "Explainer not loaded. Call load_explainer() first."}
 
-    feature_names = ["value", "rolling_mean", "rolling_std", "value_diff"]
-
-    X = pd.DataFrame([input_features])[feature_names]
+    n_features = scaler.n_features_in_ if hasattr(scaler, 'n_features_in_') else 4
+    
+    if n_features == 2:
+        feature_names = ["cpu", "memory"]
+        input_mapped = {
+            "cpu": input_features.get("value", input_features.get("cpu", 0)),
+            "memory": input_features.get("memory", input_features.get("rolling_mean", 0))
+        }
+    else:
+        feature_names = ["value", "rolling_mean", "rolling_std", "value_diff"]
+        input_mapped = input_features
+    
+    X = pd.DataFrame([input_mapped])[feature_names]
     X_scaled = scaler.transform(X)
-
-    # get SHAP values for this prediction
     shap_values = _explainer.shap_values(X_scaled)
-
-    # shap_values shape is (1, n_features) for tree explainer
     values = shap_values[0] if isinstance(shap_values, list) else shap_values[0]
 
-    # build contribution dict - positive means pushed toward anomaly
     contributions = {}
     total = sum(abs(v) for v in values)
 
@@ -57,26 +64,27 @@ def explain_prediction(model, scaler, input_features: dict) -> dict:
             "direction": direction
         }
 
-    # sort by contribution size
     sorted_contributions = dict(
         sorted(contributions.items(),
                key=lambda x: abs(x[1]["shap_value"]),
                reverse=True)
     )
 
-    # top reason is the feature with highest contribution
-    top_feature = list(sorted_contributions.keys())[0]
-    top_contrib = sorted_contributions[top_feature]
+    if sorted_contributions:
+        top_feature = list(sorted_contributions.keys())[0]
+        top_contrib = sorted_contributions[top_feature]
+        top_reason = f"{top_feature} is the main driver ({top_contrib['contribution']} contribution)"
+    else:
+        top_reason = "No significant contributors"
 
     return {
         "feature_contributions": sorted_contributions,
-        "top_reason": f"{top_feature} is the main driver ({top_contrib['contribution']} contribution)",
-        "explanation": build_explanation(sorted_contributions, input_features)
+        "top_reason": top_reason,
+        "explanation": build_explanation(sorted_contributions, input_mapped)
     }
 
 
 def build_explanation(contributions: dict, inputs: dict) -> str:
-    """Builds a human readable explanation of the prediction"""
     lines = []
     for feature, data in list(contributions.items())[:3]:
         value = inputs.get(feature, 0)

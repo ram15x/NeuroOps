@@ -2,11 +2,6 @@ import json
 from datetime import datetime
 from backend.services.redis_service import redis_client
 
-# key pattern: registry:model:{model_name}:{version} -> model record
-# key pattern: registry:active:{model_name}          -> currently active version
-# key pattern: registry:all                          -> list of all model keys
-
-
 def register_model(
     model_name   : str,
     version      : str,
@@ -75,7 +70,6 @@ def promote_model(model_name: str, version: str) -> dict:
 
     return record
 
-
 def get_model(model_name: str, version: str) -> dict | None:
     key    = f"registry:model:{model_name}:{version}"
     cached = redis_client.get(key)
@@ -112,3 +106,5 @@ def list_all_models() -> list:
     # sort by registered_at descending
     models.sort(key=lambda x: x["registered_at"], reverse=True)
     return models
+    
+    

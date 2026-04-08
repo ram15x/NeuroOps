@@ -22,11 +22,20 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
-# ========== UPDATED: Use REAL EC2 metrics (4 features only) ==========
-# Load XGBoost model (trained on REAL EC2 data)
-FAILURE_MODEL_PATH = os.path.join(settings.MODEL_PATH, "xgboost_production_model.pkl")
-model = joblib.load(FAILURE_MODEL_PATH)
-logger.info(f"Loaded XGBoost model from {FAILURE_MODEL_PATH}")
+# load XGBoost failure model — safe load, no crash if file missing
+FAILURE_MODEL_PATH = os.path.join(settings.MODEL_PATH, settings.FAILURE_MODEL_FILE)
+model = None
+_failure_model_ready = False
+
+try:
+    if os.path.exists(FAILURE_MODEL_PATH):
+        model = joblib.load(FAILURE_MODEL_PATH)
+        _failure_model_ready = True
+        logger.info("failure_model_loaded", extra={"path": FAILURE_MODEL_PATH})
+    else:
+        logger.warning("failure_model_missing_degraded_mode", extra={"path": FAILURE_MODEL_PATH})
+except Exception as e:
+    logger.error("failure_model_load_failed", extra={"error": str(e)})
 
 # XGBoost doesn't need scaler
 scaler = None

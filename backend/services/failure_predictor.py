@@ -12,8 +12,11 @@ logger = get_logger(__name__)
 # Paths for new XGBoost production model
 XGB_MODEL_PATH = os.path.join(settings.MODEL_PATH, "xgboost_production_model.pkl")
 XGB_MODEL_METADATA = os.path.join(settings.MODEL_PATH, "model_metadata.pkl")
-ORIGINAL_MODEL_PATH = os.path.join(settings.MODEL_PATH, settings.FAILURE_MODEL_FILE)
-SCALER_PATH = os.path.join(settings.MODEL_PATH, settings.FAILURE_SCALER_FILE)
+# Add fallback values if settings attributes are missing
+FAILURE_MODEL_FILE = getattr(settings, 'FAILURE_MODEL_FILE', 'xgboost_production_model.pkl')
+FAILURE_SCALER_FILE = getattr(settings, 'FAILURE_SCALER_FILE', '')
+ORIGINAL_MODEL_PATH = os.path.join(settings.MODEL_PATH, FAILURE_MODEL_FILE)
+SCALER_PATH = os.path.join(settings.MODEL_PATH, FAILURE_SCALER_FILE) if FAILURE_SCALER_FILE else None
 
 _model = None
 _scaler = None

@@ -450,7 +450,7 @@ Please check:
 3. Redis connection
 4. Database connection
 
-Dashboard: http://127.0.0.1:8000/dashboard/index.html
+Dashboard: {settings.DASHBOARD_URL}/index.html
 """
                     send_sns_alert(
                         subject="NEUROOPS ANALYZER CRASHED",

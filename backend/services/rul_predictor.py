@@ -10,8 +10,22 @@ from backend.core.config import settings
 MODEL_PATH = os.path.join(settings.MODEL_PATH, settings.RUL_MODEL_FILE)
 SCALER_PATH = os.path.join(settings.MODEL_PATH, settings.RUL_SCALER_FILE)
 
-model = joblib.load(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+# safe load — no crash if pkl files missing
+model = None
+scaler = None
+_rul_model_ready = False
+
+try:
+    if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
+        model = joblib.load(MODEL_PATH)
+        scaler = joblib.load(SCALER_PATH)
+        _rul_model_ready = True
+    else:
+        import logging as _log
+        _log.warning(f"RUL model files missing: {MODEL_PATH}, {SCALER_PATH}")
+except Exception as e:
+    import logging as _log
+    _log.error(f"RUL model load failed: {e}")
 
 
 def predict_rul(cpu_usage: float, memory_usage: float, disk_usage: float, instance_age_days: int) -> dict:

@@ -377,10 +377,10 @@ class HealingExecutor:
 
             commands = [
                 "sudo journalctl --vacuum-time=3d",
-                "sudo find /tmp -type f -atime +7 -delete",
+                f"sudo find {settings.TMP_CLEANUP_PATH} -type f -atime +7 -delete",
                 "sudo docker system prune -af --volumes 2>/dev/null || true",
                 "sudo rm -rf /var/cache/yum/* 2>/dev/null || true",
-                "sudo find /var/log -name '*.log' -mtime +30 -delete 2>/dev/null || true",
+                f"sudo find {settings.LOG_CLEANUP_PATH} -name '*.log' -mtime +{settings.LOG_CLEANUP_MAX_AGE_DAYS} -delete 2>/dev/null || true",
             ]
 
             command = " && ".join(commands)

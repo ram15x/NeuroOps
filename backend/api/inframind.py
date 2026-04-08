@@ -26,26 +26,44 @@ logger = get_logger(__name__)
 MODEL_PATH = os.path.join(settings.MODEL_PATH, settings.INFRAMIND_MODEL_FILE)
 SCALER_PATH = os.path.join(settings.MODEL_PATH, settings.INFRAMIND_SCALER_FILE)
 
-model = joblib.load(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+# safe model loading — backend starts even if pkl files are missing
+model = None
+scaler = None
+_model_ready = False
 
-# load background data for SHAP explainer
-DATA_PATH = os.path.join(settings.DATA_PATH, "processed/metrics_clean.csv")
-_bg_data = pd.read_csv(DATA_PATH)
-_bg_data = _bg_data.sort_values("metric")
-_bg_data["rolling_mean"] = _bg_data.groupby("metric")["value"].transform(
-    lambda x: x.rolling(window=5, min_periods=1).mean()
-)
-_bg_data["rolling_std"] = _bg_data.groupby("metric")["value"].transform(
-    lambda x: x.rolling(window=5, min_periods=1).std().fillna(0)
-)
-_bg_data["value_diff"] = _bg_data.groupby("metric")["value"].transform(
-    lambda x: x.diff().fillna(0)
-)
-_bg_sample = _bg_data[["value", "rolling_mean", "rolling_std", "value_diff"]].dropna().sample(
-    n=min(settings.SHAP_BACKGROUND_SAMPLES, len(_bg_data)), random_state=42
-)
-load_explainer(model, scaler, _bg_sample)
+try:
+    if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
+        model = joblib.load(MODEL_PATH)
+        scaler = joblib.load(SCALER_PATH)
+        logger.info("inframind_model_loaded")
+
+        # load background data for SHAP explainer
+        DATA_PATH = os.path.join(settings.DATA_PATH, "processed/metrics_clean.csv")
+        if os.path.exists(DATA_PATH):
+            _bg_data = pd.read_csv(DATA_PATH)
+            _bg_data = _bg_data.sort_values("metric")
+            _bg_data["rolling_mean"] = _bg_data.groupby("metric")["value"].transform(
+                lambda x: x.rolling(window=5, min_periods=1).mean()
+            )
+            _bg_data["rolling_std"] = _bg_data.groupby("metric")["value"].transform(
+                lambda x: x.rolling(window=5, min_periods=1).std().fillna(0)
+            )
+            _bg_data["value_diff"] = _bg_data.groupby("metric")["value"].transform(
+                lambda x: x.diff().fillna(0)
+            )
+            _bg_sample = _bg_data[["value", "rolling_mean", "rolling_std", "value_diff"]].dropna().sample(
+                n=min(settings.SHAP_BACKGROUND_SAMPLES, len(_bg_data)), random_state=42
+            )
+            load_explainer(model, scaler, _bg_sample)
+            logger.info("shap_explainer_loaded")
+        else:
+            logger.warning("metrics_csv_not_found_shap_disabled")
+
+        _model_ready = True
+    else:
+        logger.warning("inframind_pkl_missing_degraded_mode")
+except Exception as e:
+    logger.error("inframind_model_load_failed", extra={"error": str(e)})
 
 
 def get_or_create_service(db: Session, service_name: str):
@@ -70,6 +88,14 @@ def predict_single_metric(
     request: Request
 ) -> dict:
     """Core prediction logic reused for single and batch"""
+    # guard: model not loaded (pkl files missing)
+    if not _model_ready or model is None or scaler is None:
+        return {
+            "status": "unavailable",
+            "is_anomaly": False,
+            "message": "InfraMind model not loaded. Place inframind_model.pkl and inframind_scaler.pkl in ml_models/saved/",
+            "from_cache": False
+        }
     metric_name = data.metric
 
     cached = get_cached_alert(metric_name)

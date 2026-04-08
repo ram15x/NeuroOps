@@ -26,12 +26,8 @@ def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: 
         logs_client = get_logs_client()
         
         # Default log groups to check (EC2, Lambda, etc.)
-        default_log_groups = [
-            "/aws/ec2/neuroops-demo",
-            "/aws/lambda/neuroops",
-            "/var/log/messages",
-            "/var/log/syslog"
-        ]
+        # log groups loaded from config (set CLOUDWATCH_LOG_GROUPS_RAW in .env)
+        default_log_groups = settings.CLOUDWATCH_LOG_GROUPS
         
         # If specific log group provided, use it
         if log_group_name:

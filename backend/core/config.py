@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Database
     DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
+    DB_PORT: int = 5433
     DB_NAME: str = "neuroops_db"
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "postgres"
@@ -224,7 +224,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_GET: str = "30/minute"
     
     # JWT
-    JWT_SECRET: str = "your-secret-key-change-in-prod"
+    JWT_SECRET: str = "your-secret-key-change-in-prod"  # override in .env
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 30
     
@@ -241,13 +241,33 @@ class Settings(BaseSettings):
         "null"
     ]
     
+    # App host (used for building dashboard URLs in alerts)
+    APP_HOST: str = "localhost"
+    APP_PORT: int = 8000
+
+    @property
+    def DASHBOARD_URL(self) -> str:
+        return f"http://{self.APP_HOST}:{self.APP_PORT}/dashboard"
+
+    # Cleanup paths (used by healing executor)
+    TMP_CLEANUP_PATH: str = "/tmp"
+    LOG_CLEANUP_PATH: str = "/var/log"
+    LOG_CLEANUP_MAX_AGE_DAYS: int = 30
+
+    # CloudWatch log groups (comma-separated in .env, split here)
+    CLOUDWATCH_LOG_GROUPS_RAW: str = "/aws/ec2/neuroops-demo,/aws/lambda/neuroops"
+
+    @property
+    def CLOUDWATCH_LOG_GROUPS(self) -> list:
+        return [g.strip() for g in self.CLOUDWATCH_LOG_GROUPS_RAW.split(",") if g.strip()]
+
     # AWS
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_REGION: str = "us-east-1"
     S3_BUCKET: str = "neuroops-models"
     SNS_TOPIC_ARN: Optional[str] = None
-    EC2_INSTANCE_ID: str = "i-00dfb80a59da9a56d"
+    EC2_INSTANCE_ID: str = ""
     
     # Health Check
     HEALTH_CHECK_TIMEOUT: int = 5

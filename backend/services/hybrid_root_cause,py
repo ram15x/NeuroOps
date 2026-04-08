@@ -1,0 +1,165 @@
+from backend.core.config import settings
+import pickle
+import numpy as np
+from datetime import datetime, timedelta
+from backend.models.database import SessionLocal, MetricHistory, Alert
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from backend.services.drift_detector import record_prediction
+
+class HybridRootCauseAnalyzer:
+    def __init__(self):
+        self.db = SessionLocal()
+        self.model = None
+        self.scaler = StandardScaler()
+        self.load_or_create_model()
+
+    def load_or_create_model(self):
+        """Load trained model or create new one"""
+        try:
+            with open('root_cause_model.pkl', 'rb') as f:
+                self.model = pickle.load(f)
+            print("✅ Loaded existing model")
+        except:
+            print("⚠️ No model found, using rule-based fallback")
+            self.model = None
+
+    def extract_features(self, cpu_values):
+        """Extract features for ML model"""
+        if len(cpu_values) < 5:
+            return None
+
+        return {
+            'start': cpu_values[0],
+            'end': cpu_values[-1],
+            'max': max(cpu_values),
+            'increase': cpu_values[-1] - cpu_values[0],
+            'std': np.std(cpu_values),
+            'slope': (cpu_values[-1] - cpu_values[0]) / len(cpu_values),
+            'spike_ratio': max(cpu_values) / (cpu_values[0] + 0.01)
+        }
+
+    def get_shap_explanation(self, model, feature_vector, feature_names):
+        """Get SHAP explanation for ML prediction"""
+        try:
+            import shap
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(feature_vector)
+            
+            if len(shap_values.shape) == 3:
+                prediction = model.predict(feature_vector)[0]
+                class_idx = list(model.classes_).index(prediction) if hasattr(model, 'classes_') else 0
+                shap_for_pred = shap_values[class_idx][0]
+            else:
+                shap_for_pred = shap_values[0]
+            
+            explanation = []
+            for i, name in enumerate(feature_names):
+                influence = abs(shap_for_pred[i])
+                explanation.append({
+                    "feature": name,
+                    "value": round(float(feature_vector[0][i]), 2),
+                    "influence_percent": round(influence / sum(abs(shap_for_pred)) * 100, 1),
+                    "direction": "positive" if shap_for_pred[i] > 0 else "negative"
+                })
+            
+            explanation.sort(key=lambda x: x["influence_percent"], reverse=True)
+            return explanation[:3]
+        except Exception as e:
+            print(f"SHAP failed: {e}")
+            return []
+
+    def rule_based_analysis(self, features):
+        """Fallback rule-based logic"""
+        if features['start'] < 5 and features['increase'] > 15:
+            return {
+                "cause": "Sudden compute spike - batch job or deployment",
+                "type": "sudden_spike",
+                "confidence": 85
+            }
+        elif features['increase'] > 10:
+            return {
+                "cause": "Gradual CPU increase - possible memory leak",
+                "type": "gradual_increase",
+                "confidence": 75
+            }
+        elif features['max'] > 30:
+            return {
+                "cause": "Sustained high CPU - consistent load",
+                "type": "sustained_high",
+                "confidence": 70
+            }
+        else:
+            return {
+                "cause": "Normal variation within threshold",
+                "type": "normal",
+                "confidence": 50
+            }
+
+    def analyze(self, alert_id):
+        """Hybrid analysis: ML + Rules + SHAP explanations"""
+
+        alert = self.db.query(Alert).filter(Alert.id == alert_id).first()
+        if not alert:
+            return {"error": "Alert not found"}
+
+        metrics = self.db.query(MetricHistory).filter(
+            MetricHistory.timestamp >= alert.created_at - timedelta(minutes=30),
+            MetricHistory.timestamp <= alert.created_at
+        ).all()
+
+        cpu_values = [m.value for m in metrics if m.metric_name == 'cpu']
+
+        if len(cpu_values) < 5:
+            return {"root_cause": "Insufficient data", "confidence": 0}
+
+        features = self.extract_features(cpu_values)
+        feature_names = list(features.keys())
+
+        if self.model:
+            try:
+                feature_vector = np.array([list(features.values())])
+                prediction = self.model.predict(feature_vector)[0]
+                probability = max(self.model.predict_proba(feature_vector)[0])
+                confidence = int(probability * 100)
+                
+                is_anomaly = prediction != "normal_variation"
+                record_prediction(is_anomaly)
+                
+                shap_explanation = self.get_shap_explanation(self.model, feature_vector, feature_names)
+
+                return {
+                    "alert_id": alert_id,
+                    "root_cause": prediction,
+                    "confidence": confidence,
+                    "why": shap_explanation,
+                    "method": "ml_model_with_shap",
+                    "features": {
+                        "cpu_start": round(features['start'], 1),
+                        "cpu_end": round(features['end'], 1),
+                        "cpu_max": round(features['max'], 1),
+                        "cpu_increase": round(features['increase'], 1)
+                    }
+                }
+            except Exception as e:
+                print(f"ML failed: {e}")
+                result = self.rule_based_analysis(features)
+                result["method"] = "rule_based_fallback"
+                return result
+        else:
+            result = self.rule_based_analysis(features)
+            result["method"] = "rule_based"
+            return result
+
+    def train(self, training_data_file):
+        import pandas as pd
+        df = pd.read_csv(training_data_file)
+        feature_cols = ['cpu_start', 'cpu_end', 'cpu_max', 'cpu_increase', 'cpu_std']
+        X = df[feature_cols].values
+        y = df['label'].values
+        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.model.fit(X, y)
+        with open('root_cause_model.pkl', 'wb') as f:
+            pickle.dump(self.model, f)
+        print(f"Model trained on {len(df)} samples")
+        return True

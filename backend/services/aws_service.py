@@ -250,7 +250,7 @@ def send_sns_alert_with_timeline(subject: str, message: str, alert_id: int = Non
 {timeline.get('recommendation', 'Manual investigation required')}
 
 ━━━━━━━━━━━━━━━━━━━━━━
-🔗 View full timeline: http://localhost:8000/dashboard/rootcause/{alert_id}
+🔗 View full timeline: {settings.DASHBOARD_URL}/rootcause/{alert_id}
 ━━━━━━━━━━━━━━━━━━━━━━
 """
         message = enriched_message
