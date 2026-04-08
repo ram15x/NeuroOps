@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from backend.models.database import get_db
 from backend.services.redis_service import redis_client
+from backend.services.github_actions import trigger_github_workflow, get_workflow_status
 from datetime import datetime
 import json
 import random
+import os
 from backend.models.schemas import BuildInput
 
 router = APIRouter()
@@ -12,7 +14,7 @@ router = APIRouter()
 # build status definition
 BUILD_STAGES = ["checkout", "install", "test", "build", "dockerize", "deploy"]
 
-# Enhanced failure reasons with stage mapping
+# Enhanced failure reasons with stage mapping (for fallback simulation)
 FAILURE_REASONS = {
     "test": [
         "Unit test failed: NullPointerException in PaymentService",
@@ -338,13 +340,36 @@ def get_intelligent_suggestion(failed_at: str, reason: str, pipeline_context: di
         "severity": "MEDIUM"
     }
 
-#simulate pipeline with enhanced failure reasons
+
+# REAL GitHub Actions integration
+def run_real_pipeline(service: str, branch: str) -> dict:
+    """Trigger actual GitHub Actions workflow"""
+    result = trigger_github_workflow(service, branch)
+    
+    # Convert GitHub response to pipeline format
+    if result.get("status") == "triggered":
+        return {
+            "service": service,
+            "branch": branch,
+            "status": "triggered",
+            "workflow_url": result.get("workflow_url"),
+            "message": result.get("message"),
+            "triggered_at": datetime.utcnow().isoformat(),
+            "commit": f"#{random.randint(1000,9999)}",
+            "source": "github_actions"
+        }
+    else:
+        # Fallback to simulation if GitHub token not configured
+        return simulate_pipeline(service, branch)
+
+
+# Fallback simulation (when GitHub token not configured)
 def simulate_pipeline(service: str, branch: str) -> dict:
     stages = []
     failed_at = None
     failure_reason = None
 
-    # 25% chance of failure (slightly increased for better testing)
+    # 25% chance of failure
     fail_stage = random.randint(2, 5) if random.random() < 0.25 else None
 
     for i, stage in enumerate(BUILD_STAGES):
@@ -359,7 +384,6 @@ def simulate_pipeline(service: str, branch: str) -> dict:
         duration = random.randint(2, 30)
 
         if fail_stage and i == fail_stage:
-            # Pick a reason specific to this stage
             stage_reasons = FAILURE_REASONS.get(stage, ["General failure occurred"])
             failure_reason = random.choice(stage_reasons)
             
@@ -390,35 +414,35 @@ def simulate_pipeline(service: str, branch: str) -> dict:
         "total_time": f"{total_time}s",
         "triggered_at": datetime.utcnow().isoformat(),
         "commit": f"#{random.randint(1000,9999)}",
+        "source": "simulation"
     }
     
     return result
 
-#trigger build
+
+# Trigger build endpoint (updated to use real GitHub Actions)
 @router.post("/buildsense/trigger")
 def trigger_build(data: BuildInput, db: Session = Depends(get_db)):
     try:
         service = data.service
         branch = data.branch
 
-        # run pipeline simulation
-        pipeline = simulate_pipeline(service, branch)
+        # Run real pipeline (GitHub Actions or fallback simulation)
+        pipeline = run_real_pipeline(service, branch)
 
-        # enhanced risk assessment
+        # Enhanced risk assessment
         risk = assess_build_risk(pipeline)
         pipeline["risk"] = risk
 
-        # AI suggestion with intelligent context
-        if pipeline["status"] == "failed":
+        # AI suggestion with intelligent context (only for failed builds)
+        if pipeline["status"] in ["failed", "error"]:
             suggestion = get_intelligent_suggestion(
-                pipeline["failed_at"],
+                pipeline.get("failed_at", "unknown"),
                 pipeline.get("failure_reason", ""),
                 pipeline
             )
             pipeline["suggestion"] = suggestion
             pipeline["quick_fix"] = suggestion["quick_fix"]
-            
-            # Add helpful next steps
             pipeline["next_steps"] = suggestion["steps"]
             pipeline["severity"] = suggestion["severity"]
 
@@ -435,7 +459,7 @@ def trigger_build(data: BuildInput, db: Session = Depends(get_db)):
         return {"error": str(e), "message": "Build trigger failed"}
 
 
-#get build history
+# Get build history
 @router.get("/buildsense/history/{service}")
 def build_history(service: str):
     cached = redis_client.get(f"build:{service}")
@@ -444,7 +468,7 @@ def build_history(service: str):
     return {"service": service, "message": "No recent builds found"}
 
 
-#pipeline health overview
+# Pipeline health overview
 @router.get("/buildsense/overview")
 def pipeline_overview():
     services = [
@@ -465,15 +489,16 @@ def pipeline_overview():
             status = data["status"]
             if status == "failed":
                 failed_count += 1
-            else:
+            elif status == "success":
                 success_count += 1
                 
             overview.append({
                 "service": s,
                 "status": status,
                 "branch": data["branch"],
-                "time": data["total_time"],
-                "commit": data["commit"],
+                "time": data.get("total_time", "N/A"),
+                "commit": data.get("commit", "N/A"),
+                "source": data.get("source", "unknown"),
                 "failed_at": data.get("failed_at"),
                 "severity": data.get("severity", "LOW") if status == "failed" else "N/A"
             })
@@ -502,14 +527,13 @@ def pipeline_overview():
 
 
 def assess_build_risk(pipeline: dict) -> dict:
-    failed_stages = [s for s in pipeline["stages"] if s["status"] == "failed"]
-    total_time = sum(s["time_s"] for s in pipeline["stages"])
+    failed_stages = [s for s in pipeline.get("stages", []) if s.get("status") == "failed"]
+    total_time_str = pipeline.get("total_time", "0s")
     
     # Extract numeric time value
-    time_value = int(pipeline["total_time"].replace("s", "")) if "s" in pipeline["total_time"] else 0
+    time_value = int(total_time_str.replace("s", "")) if "s" in total_time_str else 0
 
-    if pipeline["status"] == "failed":
-        # Enhanced risk based on which stage failed
+    if pipeline.get("status") == "failed":
         stage_risk_map = {
             "test": "HIGH",
             "deploy": "CRITICAL",
@@ -518,18 +542,18 @@ def assess_build_risk(pipeline: dict) -> dict:
             "install": "MEDIUM",
             "checkout": "MEDIUM"
         }
-        level = stage_risk_map.get(pipeline["failed_at"], "HIGH")
+        level = stage_risk_map.get(pipeline.get("failed_at"), "HIGH")
         
-        message = f"Build failed at {pipeline['failed_at']} stage"
+        message = f"Build failed at {pipeline.get('failed_at')} stage"
         if pipeline.get("failure_reason"):
             message += f": {pipeline['failure_reason'][:100]}"
             
     elif time_value > 120:
         level = "MEDIUM"
-        message = f"Build time exceeding normal threshold ({pipeline['total_time']})"
+        message = f"Build time exceeding normal threshold ({total_time_str})"
     elif time_value > 60:
         level = "LOW"
-        message = f"Build time slightly elevated ({pipeline['total_time']})"
+        message = f"Build time slightly elevated ({total_time_str})"
     else:
         level = "LOW"
         message = "Build healthy and within normal parameters"
@@ -537,5 +561,5 @@ def assess_build_risk(pipeline: dict) -> dict:
     return {
         "level": level,
         "message": message,
-        "total_time": pipeline["total_time"]
+        "total_time": total_time_str
     }

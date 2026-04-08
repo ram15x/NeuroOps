@@ -1,65 +1,46 @@
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from sqlalchemy.orm import Session
-import ollama
 import json
 from datetime import datetime
+import uuid
 
 from backend.core.config import settings
-from backend.models.database import get_db, PredictionHistory, AlertCluster, Service
+from backend.models.database import get_db, PredictionHistory, AlertCluster
 from backend.services.redis_service import redis_client
 from backend.services.rate_limiter import limiter
 from backend.services.task_manager import create_job, update_job, get_job
+from backend.services.opsgpt_analyzer import analyze_log  # NEW: use two-tier analyzer
 from backend.models.schemas import LogInput, ClusterRequest
 from backend.services.log_clusterer import run_log_clustering
 from backend.services.audit_logger import AuditLogger
 from backend.api.auth import get_current_user
-from backend.services.priority_ranker import calculate_cluster_priority, get_ranked_clusters
+from backend.services.priority_ranker import calculate_cluster_priority
 
 router = APIRouter()
 
+# Simple in-memory job store (replace with Redis in production)
+jobs = {}
 
-def run_analysis(job_id: str, log_text: str, user_id=None, username=None):
+
+def run_analysis_task(job_id: str, log_text: str, user_id=None, username=None):
+    """Background task using two-tier analyzer"""
     try:
-        prompt = f"""You are an expert cloud infrastructure engineer.
-Analyze this system log and respond in this exact format:
-
-SEVERITY: [critical/warning/info]
-CAUSE: [one line root cause]
-IMPACT: [one line business impact]
-FIX: [one line recommended fix]
-
-Log: {log_text}"""
-
-        response = ollama.chat(
-            model=settings.OLLAMA_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            options={"timeout": settings.OLLAMA_TIMEOUT}
-        )
-
-        ai_response = response["message"]["content"]
-        severity = extract_field(ai_response, "SEVERITY")
-
-        result = {
-            "log": log_text,
-            "analysis": ai_response,
-            "severity": severity,
-            "cause": extract_field(ai_response, "CAUSE"),
-            "impact": extract_field(ai_response, "IMPACT"),
-            "fix": extract_field(ai_response, "FIX"),
-            "from_cache": False
-        }
-
+        # Use the new two-tier analyzer
+        result = analyze_log(log_text)
+        
+        # Cache the result
         cache_key = f"opsgpt:{hash(log_text)}"
         redis_client.setex(cache_key, settings.OPSGPT_CACHE_TTL, json.dumps(result))
+        
         update_job(job_id, "completed", result)
-
+        
     except Exception as e:
         update_job(job_id, "failed", {"error": str(e)})
 
 
 @router.post("/opsgpt/analyze")
 @limiter.limit(settings.RATE_LIMIT_POST)
-def analyze_log(
+def analyze_log_endpoint(
     request: Request,
     data: LogInput,
     background_tasks: BackgroundTasks,
@@ -68,6 +49,8 @@ def analyze_log(
 ):
     try:
         log_text = data.log
+        
+        # Check cache first
         cache_key = f"opsgpt:{hash(log_text)}"
         cached = redis_client.get(cache_key)
         if cached:
@@ -75,8 +58,11 @@ def analyze_log(
             result["from_cache"] = True
             return result
 
-        job_id = create_job("opsgpt_analyze", {"log": log_text[:500]})
+        # Create job
+        job_id = str(uuid.uuid4())
+        jobs[job_id] = {"status": "processing", "result": None}
         
+        # Store prediction history
         prediction_history = PredictionHistory(
             model_name="opsgpt",
             input_features={"log_preview": log_text[:200]},
@@ -87,6 +73,7 @@ def analyze_log(
         db.add(prediction_history)
         db.flush()
         
+        # Audit log
         AuditLogger.log(
             db=db,
             user_id=current_user.id,
@@ -99,7 +86,8 @@ def analyze_log(
         )
         db.commit()
         
-        background_tasks.add_task(run_analysis, job_id, log_text, current_user.id, current_user.username)
+        # Run background task
+        background_tasks.add_task(run_analysis_task, job_id, log_text, current_user.id, current_user.username)
 
         return {
             "job_id": job_id,
@@ -113,7 +101,9 @@ def analyze_log(
 
 @router.get("/opsgpt/result/{job_id}")
 def get_result(job_id: str):
-    return get_job(job_id)
+    """Get analysis result"""
+    job = jobs.get(job_id, {"status": "not_found", "result": None})
+    return job
 
 
 @router.post("/opsgpt/analyze-batch")
@@ -132,8 +122,9 @@ def analyze_batch(
 
         job_ids = []
         for log in logs[:settings.OPSGPT_BATCH_MAX]:
-            job_id = create_job("opsgpt_batch", {"log": log[:500]})
-            background_tasks.add_task(run_analysis, job_id, log, current_user.id, current_user.username)
+            job_id = str(uuid.uuid4())
+            jobs[job_id] = {"status": "processing", "result": None}
+            background_tasks.add_task(run_analysis_task, job_id, log, current_user.id, current_user.username)
             job_ids.append(job_id)
 
         AuditLogger.log(
@@ -159,13 +150,6 @@ def analyze_batch(
         return {"error": str(e)}
 
 
-def extract_field(text: str, field: str) -> str:
-    for line in text.split("\n"):
-        if line.startswith(f"{field}:"):
-            return line.replace(f"{field}:", "").strip()
-    return "unknown"
-
-
 @router.post("/opsgpt/clusters")
 @limiter.limit(settings.RATE_LIMIT_POST)
 def get_log_clusters(
@@ -183,13 +167,10 @@ def get_log_clusters(
             result["from_cache"] = True
             return result
 
-        # Run clustering (existing function)
         result = run_log_clustering(n_clusters=data.n_clusters)
         
-        # NEW for GAP 1: Calculate priority for each cluster and store in DB
         if result.get("clusters"):
             for cluster_data in result["clusters"]:
-                # Calculate priority score for this cluster
                 cluster_priority = calculate_cluster_priority(
                     cluster_data=cluster_data,
                     db=db
@@ -197,7 +178,6 @@ def get_log_clusters(
                 cluster_data["priority_score"] = cluster_priority["priority_score"]
                 cluster_data["priority_rank"] = cluster_priority["priority_rank"]
                 
-                # Store or update AlertCluster in database
                 cluster_id = f"cluster_{cluster_data['cluster_id']}"
                 existing_cluster = db.query(AlertCluster).filter(
                     AlertCluster.cluster_id == cluster_id
@@ -224,10 +204,8 @@ def get_log_clusters(
                     )
                     db.add(new_cluster)
             
-            # Sort clusters by priority score (highest first)
             result["clusters"].sort(key=lambda x: x.get("priority_score", 0), reverse=True)
             
-            # Update rank numbers after sorting
             for idx, cluster in enumerate(result["clusters"], 1):
                 cluster["priority_rank"] = idx
             
@@ -256,11 +234,11 @@ def get_log_clusters(
 
 
 @router.get("/opsgpt/clusters/ranked")
-def get_ranked_clusters(
+def get_ranked_clusters_endpoint(
     db: Session = Depends(get_db),
     _: dict = Depends(get_current_user)
 ):
-    """NEW endpoint for GAP 1: Get all clusters sorted by priority"""
+    """Get all clusters sorted by priority"""
     try:
         clusters = db.query(AlertCluster).filter(
             AlertCluster.status == "active"
@@ -284,6 +262,3 @@ def get_ranked_clusters(
         }
     except Exception as e:
         return {"error": str(e)}
-    
-    
-    
