@@ -1557,15 +1557,28 @@ function updateServiceGrid(services) {
 }
 
 function connectWS() {
-    if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+    if (window.ws && (window.ws.readyState === WebSocket.OPEN || window.ws.readyState === WebSocket.CONNECTING)) {
+        console.log('WebSocket already connecting or open');
         return;
     }
+    
+    console.log('Creating new WebSocket connection to:', WS);
     window.ws = new WebSocket(WS);
-    window.ws.onopen = () => { 
-        document.getElementById("live-badge").textContent = "● live"; 
+    
+    window.ws.onopen = function() {
+        console.log('WebSocket OPENED');
+        document.getElementById("live-badge").textContent = "● live";
         document.getElementById("live-badge").style.color = "#00ff88";
+        // Send a ping to keep connection alive
+        setInterval(function() {
+            if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+                window.ws.send(JSON.stringify({type: 'ping'}));
+            }
+        }, 30000);
     };
-    window.ws.onmessage = (e) => {
+    
+    window.ws.onmessage = function(e) {
+        console.log('WebSocket message received');
         try {
             const data = JSON.parse(e.data);
             if (data.type === "metric_stream") {
@@ -1601,13 +1614,16 @@ function connectWS() {
             console.log('WebSocket message error:', err);
         }
     };
-    window.ws.onclose = () => { 
-        document.getElementById("live-badge").textContent = "● reconnecting"; 
-        document.getElementById("live-badge").style.color = "#ffaa00"; 
-        setTimeout(connectWS, 3000); 
+    
+    window.ws.onclose = function(e) {
+        console.log('WebSocket CLOSED. Code:', e.code, 'Reason:', e.reason);
+        document.getElementById("live-badge").textContent = "● reconnecting";
+        document.getElementById("live-badge").style.color = "#ffaa00";
+        setTimeout(connectWS, 3000);
     };
-    window.ws.onerror = (err) => {
-        console.log('WebSocket error:', err);
+    
+    window.ws.onerror = function(err) {
+        console.log('WebSocket ERROR:', err);
     };
 }
 

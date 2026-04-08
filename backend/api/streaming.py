@@ -15,6 +15,11 @@ router = APIRouter()
 
 @router.websocket("/ws/stream")
 async def metric_stream(websocket: WebSocket):
+    # Accept the connection first (this handles the WebSocket handshake)
+    await websocket.accept()
+    logger.info("WebSocket connection accepted")
+    
+    # Add to connection manager
     await manager.connect(websocket)
     
     try:
@@ -27,11 +32,6 @@ async def metric_stream(websocket: WebSocket):
         
         while True:
             try:
-                # Check if connection is still open
-                if websocket.client_state.value != 1:  # 1 = CONNECTED
-                    logger.info("WebSocket client disconnected, breaking loop")
-                    break
-                
                 # Get real EC2 instances
                 instances = list_ec2_instances()
                 running_instances = [i for i in instances if i.get("state") == "running"]
@@ -150,14 +150,13 @@ async def metric_stream(websocket: WebSocket):
                     }
                 }
                 
-                # Only send if connection is still open
-                if websocket.client_state.value == 1:
-                    await manager.send_personal(message, websocket)
+                # Send message
+                await websocket.send_text(json.dumps(message))
                 
                 await asyncio.sleep(5)
                 
             except WebSocketDisconnect:
-                logger.info("WebSocket disconnected in inner loop")
+                logger.info("WebSocket disconnected")
                 break
             except Exception as e:
                 logger.error(f"WebSocket stream error: {e}")
