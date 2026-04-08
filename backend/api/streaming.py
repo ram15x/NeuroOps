@@ -1,4 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from sqlalchemy.orm import Session
+from backend.models.database import get_db, MetricHistory
 from backend.services.ws_manager import manager
 from backend.services.redis_service import redis_client
 from backend.services.aws_service import list_ec2_instances
@@ -7,6 +9,7 @@ import json
 import asyncio
 import random
 from datetime import datetime
+from sqlalchemy import desc
 
 logger = get_logger(__name__)
 
@@ -169,3 +172,31 @@ async def metric_stream(websocket: WebSocket):
     finally:
         manager.disconnect(websocket)
         logger.info("WebSocket cleaned up")
+
+
+@router.get("/latest-metrics")
+async def get_latest_metrics(db: Session = Depends(get_db)):
+    """Get latest CPU, Memory, Disk metrics for auto-refresh"""
+    
+    # Get latest CPU
+    cpu = db.query(MetricHistory).filter(
+        MetricHistory.metric_name == 'cpu'
+    ).order_by(desc(MetricHistory.timestamp)).first()
+    
+    # Get latest Memory
+    memory = db.query(MetricHistory).filter(
+        MetricHistory.metric_name == 'memory'
+    ).order_by(desc(MetricHistory.timestamp)).first()
+    
+    # Get latest Disk
+    disk = db.query(MetricHistory).filter(
+        MetricHistory.metric_name == 'disk'
+    ).order_by(desc(MetricHistory.timestamp)).first()
+    
+    return {
+        "cpu": cpu.value if cpu else 0,
+        "memory": memory.value if memory else 0,
+        "disk": disk.value if disk else 0,
+        "timestamp": datetime.utcnow().isoformat(),
+        "source": "auto-refresh"
+    }

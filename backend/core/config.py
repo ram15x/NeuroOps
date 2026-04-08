@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Database
     DB_HOST: str = "localhost"
-    DB_PORT: int = 5433
+    DB_PORT: int = 5432
     DB_NAME: str = "neuroops_db"
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "postgres"
@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "phi3:mini"
     OLLAMA_TIMEOUT: int = 30
     
-    
     @property
     def OLLAMA_URL(self) -> str:
         return f"http://{self.OLLAMA_HOST}:{self.OLLAMA_PORT}"
@@ -48,23 +47,21 @@ class Settings(BaseSettings):
     INFRAMIND_SCALER_FILE: str = "inframind_scaler.pkl"
     SHAP_BACKGROUND_SAMPLES: int = 100
     
-    # ========== UPDATED: REAL DATA MODELS ==========
-    # Failure Model - Now using XGBoost trained on REAL EC2 data
+    # Failure Model
     FAILURE_MODEL_FILE: str = "xgboost_production_model.pkl"
     FAILURE_MODEL_METADATA: str = "model_metadata.pkl"
-    FAILURE_SCALER_FILE: str = ""  # XGBoost doesn't need scaler
+    FAILURE_SCALER_FILE: str = ""
     
-    # RUL Model - New model trained on REAL EC2 data
+    # RUL Model
     RUL_MODEL_FILE: str = "rul_real_model.pkl"
     RUL_SCALER_FILE: str = "rul_real_scaler.pkl"
     RUL_MODEL_METADATA: str = "rul_model_metadata.pkl"
     
-    # Keep old config for backward compatibility (will be removed later)
-    RUL_MODEL_A_FILE: str = "rul_real_model.pkl"  # Point to new model
+    # Backward compatibility
+    RUL_MODEL_A_FILE: str = "rul_real_model.pkl"
     RUL_SCALER_A_FILE: str = "rul_real_scaler.pkl"
-    RUL_MODEL_B_FILE: str = ""  # Deprecated
-    RUL_SCALER_B_FILE: str = ""  # Deprecated
-    # ========== END UPDATED ==========
+    RUL_MODEL_B_FILE: str = ""
+    RUL_SCALER_B_FILE: str = ""
     
     RUL_MODEL_A_NAME: str = "RandomForestRegressor (RUL on REAL EC2 data)"
     RUL_URGENCY_CRITICAL: int = 10
@@ -75,6 +72,10 @@ class Settings(BaseSettings):
     # A/B Testing
     AB_AGREEMENT_STRONG: float = 90.0
     AB_AGREEMENT_MODERATE: float = 70.0
+    AUTO_SWAP_ENABLED: bool = True
+    AUTO_SWAP_MIN_PREDICTIONS: int = 100
+    AUTO_SWAP_THRESHOLD_PERCENT: float = 10.0
+    FAILURE_CACHE_TTL: int = 300
     
     # Severity thresholds
     SEVERITY_CRITICAL_THRESHOLD: float = -0.15
@@ -109,17 +110,17 @@ class Settings(BaseSettings):
     # Task Manager
     TASK_TTL: int = 3600
     
-    # ========== FEATURE STORE ==========
-    FEATURE_STORE_TTL: int = 86400  # 24 hours cache TTL
-    FEATURE_STORE_MAX_HISTORY: int = 1000  # max history records per entity
-    FEATURE_STORE_BATCH_SIZE: int = 100  # batch size for bulk operations
-    FEATURE_STORE_RETENTION_DAYS: int = 30  # days to keep feature history
+    # Feature Store
+    FEATURE_STORE_TTL: int = 86400
+    FEATURE_STORE_MAX_HISTORY: int = 1000
+    FEATURE_STORE_BATCH_SIZE: int = 100
+    FEATURE_STORE_RETENTION_DAYS: int = 30
     
-    # ========== AUTO-HEALING ==========
+    # Auto-Healing
     AUTO_HEALING_ENABLED: bool = True
     HEALING_COOLDOWN_MINUTES: int = 30
     HEALING_MAX_RETRIES: int = 2
-    SCALE_DOWN_ENABLED: bool = False  
+    SCALE_DOWN_ENABLED: bool = False
     HEALING_ACTION_CRITICAL: str = "RESTART AND SCALE"
     HEALING_ACTION_WARNING: str = "SCALE_UP"
     HEALING_ACTION_NORMAL: str = "NO_ACTION"
@@ -142,19 +143,19 @@ class Settings(BaseSettings):
     HEALING_CACHE_TTL: int = 300
     INCIDENT_CREATION_ENABLED: bool = True
     
-    # ========== METRICS ANALYZER ==========
+    # Metrics Analyzer
     MAX_INSTANCES_PER_RUN: int = 5
-    ANALYZER_RETRY_DELAY: int = 5  # seconds between retries
+    ANALYZER_RETRY_DELAY: int = 5
     
     # Failure Correlation
-    NUM_SENSORS: int = 4  # Reduced to 4 (CPU, Memory, Disk, Age) for REAL data
+    NUM_SENSORS: int = 4
     CORRELATION_MIN_SERVICES: int = 2
     CORRELATION_RUL_THRESHOLD: int = 20
     CORRELATION_MESSAGE_CORRELATED: str = "Multiple services showing similar degradation patterns — potential systemic issue"
     CORRELATION_MESSAGE_INDEPENDENT: str = "Services showing independent degradation patterns"
     URGENCY_RISK_LEVELS: List[str] = ["CRITICAL", "HIGH"]
     
-    # Sensor Variation (keeping for backward compatibility)
+    # Sensor Variation
     SENSOR_VARIATION_STRENGTH: float = 0.08
     SENSOR_VARIATION_MIN: float = 0.97
     SENSOR_VARIATION_MAX: float = 1.05
@@ -174,38 +175,13 @@ class Settings(BaseSettings):
     }
     SENSOR_CAP_MULTIPLIER: float = 1.05
     
-    # Service Baselines (updated for REAL data - using 4 features)
+    # Service Baselines
     SERVICE_BASELINES: Dict[str, Dict[str, float]] = {
-        "default": {
-            "cpu": 50.0,
-            "memory": 40.0,
-            "disk": 30.0,
-            "age": 30
-        },
-        "engine_api": {
-            "cpu": 45.0,
-            "memory": 35.0,
-            "disk": 25.0,
-            "age": 30
-        },
-        "payment_service": {
-            "cpu": 60.0,
-            "memory": 50.0,
-            "disk": 40.0,
-            "age": 30
-        },
-        "auth_service": {
-            "cpu": 40.0,
-            "memory": 30.0,
-            "disk": 20.0,
-            "age": 30
-        },
-        "cache_layer": {
-            "cpu": 35.0,
-            "memory": 45.0,
-            "disk": 15.0,
-            "age": 30
-        }
+        "default": {"cpu": 50.0, "memory": 40.0, "disk": 30.0, "age": 30},
+        "engine_api": {"cpu": 45.0, "memory": 35.0, "disk": 25.0, "age": 30},
+        "payment_service": {"cpu": 60.0, "memory": 50.0, "disk": 40.0, "age": 30},
+        "auth_service": {"cpu": 40.0, "memory": 30.0, "disk": 20.0, "age": 30},
+        "cache_layer": {"cpu": 35.0, "memory": 45.0, "disk": 15.0, "age": 30}
     }
     
     SERVICE_DEGRADATION_RATES: Dict[str, float] = {
@@ -224,7 +200,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_GET: str = "30/minute"
     
     # JWT
-    JWT_SECRET: str = "your-secret-key-change-in-prod"  # override in .env
+    JWT_SECRET: str = "your-secret-key-change-in-prod"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 30
     
@@ -241,7 +217,7 @@ class Settings(BaseSettings):
         "null"
     ]
     
-    # App host (used for building dashboard URLs in alerts)
+    # App host
     APP_HOST: str = "localhost"
     APP_PORT: int = 8000
 
@@ -249,17 +225,22 @@ class Settings(BaseSettings):
     def DASHBOARD_URL(self) -> str:
         return f"http://{self.APP_HOST}:{self.APP_PORT}/dashboard"
 
-    # Cleanup paths (used by healing executor)
+    # Cleanup paths
     TMP_CLEANUP_PATH: str = "/tmp"
     LOG_CLEANUP_PATH: str = "/var/log"
     LOG_CLEANUP_MAX_AGE_DAYS: int = 30
 
-    # CloudWatch log groups (comma-separated in .env, split here)
+    # CloudWatch log groups
     CLOUDWATCH_LOG_GROUPS_RAW: str = "/aws/ec2/neuroops-demo,/aws/lambda/neuroops"
 
     @property
     def CLOUDWATCH_LOG_GROUPS(self) -> list:
         return [g.strip() for g in self.CLOUDWATCH_LOG_GROUPS_RAW.split(",") if g.strip()]
+
+    # ========== DASHBOARD AUTO-REFRESH SETTINGS (Question 6) ==========
+    DASHBOARD_AUTO_REFRESH_INTERVAL: int = 10  # seconds between auto-refresh
+    DASHBOARD_MANUAL_MODE_DURATION: int = 20  # seconds before auto-refresh resumes after manual interaction
+    DASHBOARD_AUTO_FETCH_ENABLED: bool = True  # enable/disable auto-refresh globally
 
     # AWS
     AWS_ACCESS_KEY_ID: Optional[str] = None

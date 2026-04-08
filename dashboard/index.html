@@ -567,6 +567,7 @@
             border-color: var(--border) !important;
             color: var(--text2) !important;
             font-style: italic;
+            transition: all 0.2s ease;
         }
 
         .input-user {
@@ -575,6 +576,25 @@
             color: var(--text) !important;
             font-weight: 500;
             border-width: 2px;
+            box-shadow: 0 0 5px rgba(0,212,255,0.3);
+        }
+
+        .auto-refresh-badge {
+            display: inline-block;
+            background: rgba(0,255,136,0.15);
+            color: var(--green);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .manual-mode-badge {
+            background: rgba(255,68,85,0.15);
+            color: var(--red);
+            animation: none;
         }
 
         .input-row {
@@ -1146,6 +1166,144 @@ const WS = (window.location.protocol === "https:" ? "wss://" : "ws://") + window
 let authToken = localStorage.getItem('neuroops_token');
 let currentInstanceId = null;
 
+// ========== AUTO-REFRESH + MANUAL OVERRIDE SYSTEM ==========
+let autoRefreshTimer = null;
+let autoRefreshActive = true;
+let manualModeTimeout = null;
+const AUTO_REFRESH_INTERVAL = 15000;
+const MANUAL_MODE_DURATION = 20000;
+let manuallyModifiedInputs = new Set();
+
+function markUserModified(element) {
+    const inputId = element.id || element.name;
+    if (inputId) {
+        manuallyModifiedInputs.add(inputId);
+    }
+    element.classList.remove('input-auto');
+    element.classList.add('input-user');
+    
+    const badge = document.getElementById('auto-mode-badge');
+    if (badge) {
+        badge.textContent = '✏️ MANUAL MODE';
+        badge.classList.add('manual-mode-badge');
+        badge.classList.remove('auto-refresh-badge');
+    }
+    
+    if (autoRefreshActive) {
+        pauseAutoRefresh();
+        startManualModeTimeout();
+    }
+}
+
+function startManualModeTimeout() {
+    if (manualModeTimeout) clearTimeout(manualModeTimeout);
+    manualModeTimeout = setTimeout(() => {
+        resumeAutoRefresh();
+    }, MANUAL_MODE_DURATION);
+}
+
+function pauseAutoRefresh() {
+    if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+    }
+    autoRefreshActive = false;
+    console.log('Auto-refresh paused - manual mode active');
+}
+
+function resumeAutoRefresh() {
+    if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+    }
+    autoRefreshActive = true;
+    manuallyModifiedInputs.clear();
+    autoRefreshTimer = setInterval(() => {
+        if (autoRefreshActive) {
+            fetchLatestMetricsAndUpdate();
+        }
+    }, AUTO_REFRESH_INTERVAL);
+    
+    const badge = document.getElementById('auto-mode-badge');
+    if (badge) {
+        badge.textContent = '🔄 AUTO MODE';
+        badge.classList.remove('manual-mode-badge');
+        badge.classList.add('auto-refresh-badge');
+    }
+    
+    document.querySelectorAll('input, select, textarea').forEach(input => {
+        const inputId = input.id || input.name;
+        if (!manuallyModifiedInputs.has(inputId)) {
+            input.classList.remove('input-user');
+            input.classList.add('input-auto');
+        }
+    });
+    
+    fetchLatestMetricsAndUpdate();
+    console.log('Auto-refresh resumed');
+}
+
+async function fetchLatestMetricsAndUpdate() {
+    if (!autoRefreshActive) return;
+    
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const response = await fetch(`${API}/streaming/latest-metrics`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data && data.cpu !== undefined) {
+            const metricValueInput = document.getElementById('metric-value');
+            if (metricValueInput && !manuallyModifiedInputs.has('metric-value')) {
+                metricValueInput.value = data.cpu.toFixed(1);
+                metricValueInput.classList.add('input-auto');
+                metricValueInput.classList.remove('input-user');
+            }
+            
+            const sensor1Input = document.getElementById('sensor1');
+            if (sensor1Input && !manuallyModifiedInputs.has('sensor1')) {
+                sensor1Input.value = data.cpu.toFixed(1);
+                sensor1Input.classList.add('input-auto');
+                sensor1Input.classList.remove('input-user');
+            }
+            
+            const ec2Display = document.getElementById('ec2-cpu-display');
+            if (ec2Display) {
+                ec2Display.textContent = `${data.cpu.toFixed(1)}%`;
+            }
+            
+            pushChart(anomalyChart, data.cpu, data.cpu > 80);
+            console.log(`Auto-refresh: CPU=${data.cpu}%, Memory=${data.memory}%, Disk=${data.disk}%`);
+        }
+    } catch(e) {
+        console.log('Auto-refresh failed:', e);
+    }
+}
+
+function initAutoRefresh() {
+    const headerRight = document.querySelector('.header-right');
+    if (headerRight && !document.getElementById('auto-mode-badge')) {
+        const badge = document.createElement('span');
+        badge.id = 'auto-mode-badge';
+        badge.className = 'auto-refresh-badge';
+        badge.textContent = '🔄 AUTO MODE';
+        badge.style.marginRight = '12px';
+        badge.style.fontSize = '10px';
+        headerRight.insertBefore(badge, headerRight.firstChild);
+    }
+    
+    document.querySelectorAll('input, select, textarea').forEach(input => {
+        input.addEventListener('focus', () => markUserModified(input));
+        input.addEventListener('change', () => markUserModified(input));
+        input.addEventListener('input', () => markUserModified(input));
+        input.classList.add('input-auto');
+    });
+    
+    resumeAutoRefresh();
+}
+
 function showToast(message, severity = 'info', title = null) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -1321,34 +1479,6 @@ async function runDrift() { setLoading("drift-result"); try { const data = await
 async function runOpsGPT() { setLoading("ops-result", "ai analyzing log..."); try { const init = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); setBox("ops-result", `job started: ${init.job_id}\npolling...`, "loading"); pollJob(init.job_id, "ops-result"); } catch(e) { setBox("ops-result", e.message, "error"); } }
 async function pollJob(jobId, boxId, interval = 2000) { const timer = setInterval(async () => { try { const data = await get(`${API}/opsgpt/result/${jobId}`); if (data.status === "completed") { clearInterval(timer); setBox(boxId, data.result); } else if (data.status === "failed") { clearInterval(timer); setBox(boxId, data, "error"); } } catch(e) { clearInterval(timer); setBox(boxId, e.message, "error"); } }, interval); }
 async function runClusters() { setLoading("cluster-result"); try { const n = parseInt(document.getElementById("n-clusters").value); const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n }); const summary = data.clusters.map(c => `cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  keywords: ${c.top_keywords.join(", ")}`).join("\n\n"); setBox("cluster-result", `total logs: ${data.total_logs_analyzed} | clusters: ${data.n_clusters}\n\n${summary}`); } catch(e) { setBox("cluster-result", e.message, "error"); } }
-
-function markUserModified(element) {
-    element.classList.remove('input-auto');
-    element.classList.add('input-user');
-    const inputId = element.id;
-    localStorage.setItem(`user_modified_${inputId}`, 'true');
-}
-
-function setAutoValue(element, value) {
-    if (!element) return;
-    const inputId = element.id;
-    const wasUserModified = localStorage.getItem(`user_modified_${inputId}`);
-    if (!wasUserModified) {
-        element.classList.add('input-auto');
-        element.classList.remove('input-user');
-        element.value = value;
-    }
-}
-
-function initAutoStyles() {
-    const inputs = document.querySelectorAll('input, select, textarea');
-    inputs.forEach(input => {
-        input.addEventListener('focus', () => markUserModified(input));
-        input.addEventListener('change', () => markUserModified(input));
-        input.addEventListener('input', () => markUserModified(input));
-        input.classList.add('input-auto');
-    });
-}
 
 function getSensorPayload(unitId) { 
     return { 
@@ -1569,7 +1699,6 @@ function connectWS() {
         console.log('WebSocket OPENED');
         document.getElementById("live-badge").textContent = "● live";
         document.getElementById("live-badge").style.color = "#00ff88";
-        // Send a ping to keep connection alive
         setInterval(function() {
             if (window.ws && window.ws.readyState === WebSocket.OPEN) {
                 window.ws.send(JSON.stringify({type: 'ping'}));
@@ -1687,11 +1816,23 @@ async function autoPopulateInputs() {
             if (metrics && metrics.cpu_percent !== null) {
                 const cpuValue = parseFloat(metrics.cpu_percent).toFixed(1);
                 const metricValueInput = document.getElementById('metric-value');
-                if (metricValueInput) setAutoValue(metricValueInput, cpuValue);
-                const failureCpuInput = document.getElementById('sensor1');
-                if (failureCpuInput) setAutoValue(failureCpuInput, cpuValue);
+                if (metricValueInput && !manuallyModifiedInputs.has('metric-value')) {
+                    metricValueInput.value = cpuValue;
+                    metricValueInput.classList.add('input-auto');
+                    metricValueInput.classList.remove('input-user');
+                }
+                const sensor1Input = document.getElementById('sensor1');
+                if (sensor1Input && !manuallyModifiedInputs.has('sensor1')) {
+                    sensor1Input.value = cpuValue;
+                    sensor1Input.classList.add('input-auto');
+                    sensor1Input.classList.remove('input-user');
+                }
                 const unitIdInput = document.getElementById('unit-id');
-                if (unitIdInput) setAutoValue(unitIdInput, instanceId);
+                if (unitIdInput && !manuallyModifiedInputs.has('unit-id')) {
+                    unitIdInput.value = instanceId;
+                    unitIdInput.classList.add('input-auto');
+                    unitIdInput.classList.remove('input-user');
+                }
                 console.log(`Auto-populated CPU: ${cpuValue}%`);
             }
         }
@@ -1748,26 +1889,39 @@ async function autoPopulateFailure() {
             const statusData = await statusRes.json();
             const rebootRes = await fetch(`${API}/aws/reboot-count/${instanceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const rebootData = await rebootRes.json();
+            
             const unitIdInput = document.getElementById('unit-id');
-            if (unitIdInput) setAutoValue(unitIdInput, instanceId);
+            if (unitIdInput && !manuallyModifiedInputs.has('unit-id')) {
+                unitIdInput.value = instanceId;
+                unitIdInput.classList.add('input-auto');
+                unitIdInput.classList.remove('input-user');
+            }
             const cpuInput = document.getElementById('sensor1');
-            if (cpuInput && metrics.cpu_percent !== undefined) {
-                setAutoValue(cpuInput, parseFloat(metrics.cpu_percent).toFixed(1));
+            if (cpuInput && metrics.cpu_percent !== undefined && !manuallyModifiedInputs.has('sensor1')) {
+                cpuInput.value = parseFloat(metrics.cpu_percent).toFixed(1);
+                cpuInput.classList.add('input-auto');
+                cpuInput.classList.remove('input-user');
             }
             const statusSelect = document.getElementById('sensor2');
-            if (statusSelect && statusData.is_healthy !== undefined) {
-                setAutoValue(statusSelect, statusData.is_healthy ? '1' : '0');
+            if (statusSelect && statusData.is_healthy !== undefined && !manuallyModifiedInputs.has('sensor2')) {
+                statusSelect.value = statusData.is_healthy ? '1' : '0';
+                statusSelect.classList.add('input-auto');
+                statusSelect.classList.remove('input-user');
             }
             const rebootInput = document.getElementById('sensor3');
-            if (rebootInput && rebootData.count !== undefined) {
-                setAutoValue(rebootInput, rebootData.count);
+            if (rebootInput && rebootData.count !== undefined && !manuallyModifiedInputs.has('sensor3')) {
+                rebootInput.value = rebootData.count;
+                rebootInput.classList.add('input-auto');
+                rebootInput.classList.remove('input-user');
             }
             const ageInput = document.getElementById('sensor4');
-            if (ageInput && instance.launch_time) {
+            if (ageInput && instance.launch_time && !manuallyModifiedInputs.has('sensor4')) {
                 const launchDate = new Date(instance.launch_time);
                 const now = new Date();
                 const ageDays = Math.floor((now - launchDate) / (1000 * 60 * 60 * 24));
-                setAutoValue(ageInput, ageDays);
+                ageInput.value = ageDays;
+                ageInput.classList.add('input-auto');
+                ageInput.classList.remove('input-user');
             }
             console.log('Failure tab auto-populated');
         }
@@ -2170,7 +2324,6 @@ function addAlert(data) {
     const sev = data.severity || "normal";
     const priority = data.priority_score || 0;
     
-    // Priority badge
     let priorityBadge = '';
     if (priority >= 80) priorityBadge = '<span class="tag" style="background:rgba(255,68,85,0.3); color:#ff4455; margin-right:8px;">🔥 PRIORITY 1</span>';
     else if (priority >= 50) priorityBadge = '<span class="tag" style="background:rgba(255,170,0,0.3); color:#ffaa00; margin-right:8px;">⚠️ PRIORITY 2</span>';
@@ -2225,7 +2378,7 @@ async function init() {
     loadTheme();
     const isAuth = await checkAuth();
     if (isAuth) {
-        initAutoStyles();
+        initAutoRefresh();
         loadAlerts(); 
         connectWS();
         loadHistoricalScores(); 
@@ -2252,7 +2405,7 @@ async function init() {
         setInterval(loadHealingTimeline, 60000);
         setInterval(loadServiceDropdowns, 60000);
         setInterval(loadServices, 60000);
-        setInterval(loadPrioritizedAlerts, 30000); 
+        setInterval(loadPrioritizedAlerts, 30000);
         setTimeout(autoFetchLatestPredictions, 2000);
     }
 }
