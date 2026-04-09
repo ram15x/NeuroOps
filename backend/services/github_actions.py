@@ -60,3 +60,30 @@ def _simulate_build_stages(service_name: str):
         "failed_at": failed_at,
         "total_time": sum(r["time_s"] for r in results)
     }
+def get_workflow_status(run_id: int):
+    """Get status of a GitHub Actions workflow run"""
+    import requests
+    import os
+    
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+    GITHUB_REPO = os.getenv("GITHUB_REPO", "ram15x/NeuroOps")
+    
+    if not GITHUB_TOKEN:
+        return {"status": "unknown", "message": "GitHub token not configured"}
+    
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs/{run_id}"
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+    
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "status": data.get("status", "unknown"),
+                "conclusion": data.get("conclusion"),
+                "run_id": run_id,
+                "url": data.get("html_url")
+            }
+        return {"status": "error", "message": f"API returned {response.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

@@ -1,0 +1,19 @@
+[Unit]
+Description=NeuroOps Production Service
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/NeuroOps
+Environment="PATH=/home/ec2-user/NeuroOps/neuroops_env/bin"
+Environment="PYTHONPATH=/home/ec2-user/NeuroOps"
+ExecStart=/home/ec2-user/NeuroOps/neuroops_env/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

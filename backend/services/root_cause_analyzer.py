@@ -1,5 +1,4 @@
 import json
-import ollama
 from datetime import datetime
 from sqlalchemy.orm import Session
 from backend.services.slack_notifier import get_slack_notifier
@@ -147,3 +146,75 @@ def auto_analyze_anomaly(db: Session, anomaly_data: dict) -> dict:
     """Helper function to trigger analysis"""
     analyzer = RootCauseAnalyzer(db)
     return analyzer.analyze_anomaly(anomaly_data)
+def enhanced_root_cause_analysis(alert):
+    """Enhanced root cause analysis with better confidence"""
+    cpu_value = alert.metric_value
+    severity = alert.severity
+    
+    if cpu_value > 90:
+        return {
+            "root_cause": "CPU spike detected - possible batch job or deployment",
+            "confidence": 85,
+            "suggestion": "Check recent deployments and running cron jobs"
+        }
+    elif cpu_value > 75:
+        return {
+            "root_cause": "High CPU usage - possible memory leak or inefficient code",
+            "confidence": 75,
+            "suggestion": "Profile application, check for infinite loops"
+        }
+    elif cpu_value > 60:
+        return {
+            "root_cause": "Elevated CPU - increased load or degraded performance",
+            "confidence": 65,
+            "suggestion": "Monitor trend, consider scaling"
+        }
+    else:
+        return {
+            "root_cause": "Normal CPU variation - no action needed",
+            "confidence": 50,
+            "suggestion": "Continue monitoring"
+        }
+
+def enhanced_root_cause_with_confidence(alert):
+    """Enhanced root cause analysis with better confidence scoring"""
+    cpu_value = alert.metric_value
+    severity = alert.severity
+    anomaly_score = getattr(alert, 'anomaly_score', 0)
+    
+    # Calculate confidence based on multiple factors
+    confidence = 50
+    
+    if cpu_value > 90:
+        confidence = 85
+        root_cause = "Critical CPU spike detected - likely batch job, deployment, or runaway process"
+        suggestion = "Check recent deployments, running cron jobs, and top processes"
+    elif cpu_value > 75:
+        confidence = 75
+        root_cause = "High CPU usage - possible memory leak, inefficient code, or increased load"
+        suggestion = "Profile application, check for infinite loops, consider scaling"
+    elif cpu_value > 60:
+        confidence = 65
+        root_cause = "Elevated CPU - increased load or beginning of degradation"
+        suggestion = "Monitor trend, analyze recent changes, prepare for potential scale"
+    elif anomaly_score < -0.1:
+        confidence = 70
+        root_cause = "Anomaly detected by ML model - unusual pattern in metrics"
+        suggestion = "Review model explanation, check for external factors"
+    else:
+        confidence = 50
+        root_cause = "Normal CPU variation - within expected range"
+        suggestion = "Continue monitoring, no action needed"
+    
+    # Adjust confidence based on severity
+    if severity == "critical":
+        confidence = min(95, confidence + 10)
+    elif severity == "warning":
+        confidence = min(90, confidence + 5)
+    
+    return {
+        "root_cause": root_cause,
+        "confidence": confidence,
+        "suggestion": suggestion,
+        "analyzed_at": datetime.utcnow().isoformat()
+    }

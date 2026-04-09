@@ -1,3 +1,4 @@
+from typing import Optional, List, Dict, Any
 import json
 from datetime import datetime
 from backend.services.redis_service import redis_client
@@ -70,13 +71,13 @@ def promote_model(model_name: str, version: str) -> dict:
 
     return record
 
-def get_model(model_name: str, version: str) -> dict | None:
+def get_model(model_name: str, version: str) -> Optional[dict]:
     key    = f"registry:model:{model_name}:{version}"
     cached = redis_client.get(key)
     return json.loads(cached) if cached else None
 
 
-def get_active_model(model_name: str) -> dict | None:
+def get_active_model(model_name: str) -> Optional[dict]:
     key    = f"registry:active:{model_name}"
     cached = redis_client.get(key)
     return json.loads(cached) if cached else None

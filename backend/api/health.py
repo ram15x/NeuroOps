@@ -85,13 +85,10 @@ def detailed_health_check(db: Session = Depends(get_db)):
     
     # Check Ollama
     try:
-        import ollama
-        response = ollama.list()
-        checks["ollama"]["status"] = "healthy"
-        checks["ollama"]["models"] = [m.get("name") for m in response.get("models", [])[:3]]
+        checks["ollama"]["status"] = "disabled"
+        checks["ollama"]["note"] = "Ollama removed in production"
     except Exception as e:
-        checks["ollama"]["status"] = "unhealthy"
-        checks["ollama"]["error"] = str(e)
+        checks["ollama"]["status"] = "disabled"
         overall_status = "degraded"
         logger.warning("ollama_health_check_failed", error=str(e))
     

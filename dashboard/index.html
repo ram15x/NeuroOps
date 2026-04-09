@@ -1161,7 +1161,7 @@
 
 <script>
 const API = window.location.origin + "/api/v1";
-const WS = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws/stream";
+const WS = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/api/v1/ws/stream";
 
 let authToken = localStorage.getItem('neuroops_token');
 let currentInstanceId = null;
@@ -1476,19 +1476,7 @@ async function sendSNSAlert() { const token = localStorage.getItem("neuroops_tok
 
 async function runInfraMind() { setLoading("inf-result"); try { const data = await post(`${API}/inframind/predict`, { metric: "ec2_cpu", value: parseFloat(document.getElementById("metric-value").value), rolling_mean: parseFloat(document.getElementById("rolling-mean").value), rolling_std: parseFloat(document.getElementById("rolling-std").value), value_diff: parseFloat(document.getElementById("value-diff").value) }); setBox("inf-result", data, data.is_anomaly ? "error" : ""); pushChart(infChart, data.anomaly_score, data.is_anomaly); addAlert({ severity: data.severity, message: `inframind — score ${data.anomaly_score}` }); showToast(`Anomaly score: ${data.anomaly_score}`, data.severity, `📊 ${data.severity.toUpperCase()}`); } catch(e) { setBox("inf-result", e.message, "error"); } }
 async function runDrift() { setLoading("drift-result"); try { const data = await get(`${API}/inframind/drift`); setBox("drift-result", data, data.drift_detected ? "error" : ""); } catch(e) { setBox("drift-result", e.message, "error"); } }
-async function runOpsGPT() { setLoading("ops-result", "ai analyzing log..."); try { const init = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); setBox("ops-result", `job started: ${init.job_id}\npolling...`, "loading"); pollJob(init.job_id, "ops-result"); } catch(e) { setBox("ops-result", e.message, "error"); } }
-async function pollJob(jobId, boxId, interval = 2000) { const timer = setInterval(async () => { try { const data = await get(`${API}/opsgpt/result/${jobId}`); if (data.status === "completed") { clearInterval(timer); setBox(boxId, data.result); } else if (data.status === "failed") { clearInterval(timer); setBox(boxId, data, "error"); } } catch(e) { clearInterval(timer); setBox(boxId, e.message, "error"); } }, interval); }
-async function runClusters() { setLoading("cluster-result"); try { const n = parseInt(document.getElementById("n-clusters").value); const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n }); const summary = data.clusters.map(c => `cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  keywords: ${c.top_keywords.join(", ")}`).join("\n\n"); setBox("cluster-result", `total logs: ${data.total_logs_analyzed} | clusters: ${data.n_clusters}\n\n${summary}`); } catch(e) { setBox("cluster-result", e.message, "error"); } }
-
-function getSensorPayload(unitId) { 
-    return { 
-        unit_id: unitId, 
-        cpu: parseFloat(document.getElementById("sensor1").value),
-        status_check: parseFloat(document.getElementById("sensor2").value),
-        recent_reboots: parseFloat(document.getElementById("sensor3").value),
-        instance_age: parseFloat(document.getElementById("sensor4").value)
-    }; 
-}
+async function runOpsGPT() { setLoading("ops-result", "analyzing log..."); try { const result = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); if (result.error) { setBox("ops-result", result.error, "error"); } else { setBox("ops-result", result, result.severity === "critical" ? "error" : ""); } } catch(e) { setBox("ops-result", e.message, "error"); } }
 
 async function runFailure() { 
     setLoading("fail-result"); 
@@ -2413,4 +2401,20 @@ async function init() {
 init();
 </script>
 </body>
-</html>
+</html><script>
+// Add IP change detection
+function checkBackendReachable() {
+    fetch('/api/v1/health')
+        .then(response => {
+            if (!response.ok) {
+                showToast('Backend connection issue. Please refresh or contact admin.', 'warning');
+            }
+        })
+        .catch(() => {
+            showToast('⚠️ Cannot reach backend. EC2 IP may have changed. Please refresh.', 'error');
+        });
+}
+
+// Run every 5 minutes
+setInterval(checkBackendReachable, 300000);
+</script>

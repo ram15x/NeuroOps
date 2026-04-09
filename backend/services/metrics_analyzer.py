@@ -221,24 +221,25 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 })
             )
             
-            pred_history = PredictionHistory(
-                model_name="failure_predictor",
-                input_features={
-                    "cpu": cpu_value,
-                    "memory": memory_percent,
-                    "disk": disk_percent,
-                    "status_ok": status_ok,
-                    "recent_reboots": recent_reboots,
-                    "instance_age_days": age_days
-                },
-                prediction={
-                    "will_fail": prediction["will_fail_soon"],
-                    "probability": prediction["failure_probability"],
-                    "risk": prediction["risk_level"]
-                },
-                created_at=datetime.utcnow()
-            )
-            db.add(pred_history)
+            # pred_history disabled - handled by failure.py
+            # pred_history = PredictionHistory(
+            #     model_name="failure_predictor",
+            #     input_features={
+            #         "cpu": cpu_value,
+            #         "memory": memory_percent,
+            #         "disk": disk_percent,
+            #         "status_ok": status_ok,
+            #         "recent_reboots": recent_reboots,
+            #         "instance_age_days": age_days
+            #     },
+            #     prediction={
+            #         "will_fail": prediction["will_fail_soon"],
+            #         "probability": prediction["failure_probability"],
+            #         "risk": prediction["risk_level"]
+            #     },
+            #     created_at=datetime.utcnow()
+            # )
+            # db.add(pred_history)
             
             logger.info(f"Failure prediction: {prediction['risk_level']} ({prediction['failure_probability']}%) with real memory={memory_percent}%, disk={disk_percent}%")
             
@@ -258,7 +259,7 @@ def process_metric(db, instance_id: str, cpu_value: float, timestamp: str):
                 2388.09, 8138.62, 8.42, 0.03, 392.0, 2388.0
             ][:24]
             
-            rul_result = predict_rul(sensor_values)
+            rul_result = predict_rul(cpu_usage=cpu_value, memory_usage=memory_percent, disk_usage=disk_percent, instance_age_days=age_days)
             
             redis_client.setex(
                 f"rul_prediction:{instance_id}",

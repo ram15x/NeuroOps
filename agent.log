@@ -1,2 +1,1 @@
 nohup: ignoring input
-python3: can't open file '/home/ec2-user/NeuroOps/neuroops_agent.py': [Errno 2] No such file or directory

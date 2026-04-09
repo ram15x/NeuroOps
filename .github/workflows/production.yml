@@ -1,0 +1,39 @@
+name: NeuroOps Production CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # Use hostname or IP from secret
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@$EC2_HOST << 'ENDSSH'
+            echo "🚀 Deployment started at $(date)"
+            cd /home/ec2-user/NeuroOps
+            git pull origin main
+            source neuroops_env/bin/activate
+            pip install -r requirements.txt
+            sudo systemctl restart neuroops
+            echo "✅ Deployment completed at $(date)"
+          ENDSSH

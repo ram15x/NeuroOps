@@ -1,0 +1,35 @@
+[
+  {
+    "instance_id": "ip-172-31-10-55.ec2.internal",
+    "cpu_avg": 28.293661971831007,
+    "cpu_max": 96.5,
+    "cpu_trend": -0.0879861800522312,
+    "anomaly_count": 0,
+    "health_score": 100.8798618005223,
+    "data_points": 284,
+    "first_seen": "2026-04-08 09:50:36.187396",
+    "last_seen": "2026-04-08 13:37:17.169249"
+  },
+  {
+    "instance_id": "",
+    "cpu_avg": 56.35224191866523,
+    "cpu_max": 100.0,
+    "cpu_trend": -0.03922067965064516,
+    "anomaly_count": 300,
+    "health_score": 0,
+    "data_points": 959,
+    "first_seen": "2026-04-08 13:37:31.040454",
+    "last_seen": "2026-04-09 09:56:44.245686"
+  },
+  {
+    "instance_id": "i-00dfb80a59da9a56d",
+    "cpu_avg": 44.726068893308515,
+    "cpu_max": 100.0,
+    "cpu_trend": 0.02578697297403501,
+    "anomaly_count": 298,
+    "health_score": 0,
+    "data_points": 521,
+    "first_seen": "2026-04-08 09:49:51.145761",
+    "last_seen": "2026-04-09 09:56:36.537372"
+  }
+]

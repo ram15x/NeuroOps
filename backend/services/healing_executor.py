@@ -728,3 +728,11 @@ class HealingExecutor:
         self.db.commit()
 
         return result
+# Fix for JSON serialization in healing_actions
+import json
+
+def _safe_json_dumps(obj):
+    """Convert dict to JSON string safely"""
+    if isinstance(obj, dict):
+        return json.dumps(obj, default=str)
+    return obj

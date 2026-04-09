@@ -1,3 +1,55 @@
+
+import json
+import numpy as np
+
+class SafeJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.bool_, np.bool)):
+            return bool(obj)
+        if isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        if isinstance(obj, (np.floating, np.float64, np.float32)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+def safe_json_dumps(obj):
+    return json.dumps(obj, cls=SafeJSONEncoder)
+import numpy as np
+
+import json
+import numpy as np
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for numpy types"""
+    def default(self, obj):
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+def safe_json_dumps(obj):
+    """Safely dump JSON with numpy type handling"""
+    return json.dumps(obj, cls=NumpyJSONEncoder)
+
+
+def convert_numpy_types(obj):
+    """Convert numpy types to Python native types for JSON serialization"""
+    if hasattr(obj, 'tolist'):
+        return obj.tolist()
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    return obj
 from sqlalchemy import create_engine, Column, Integer, Float, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -83,12 +135,21 @@ class AlertCluster(Base):
 
 
 class PredictionHistory(Base):
+
+    def __init__(self, **kwargs):
+        # Convert dicts to JSON strings
+        if 'input_features' in kwargs and isinstance(kwargs['input_features'], dict):
+            kwargs['input_features'] = safe_json_dumps(kwargs['input_features'])
+        if 'prediction' in kwargs and isinstance(kwargs['prediction'], dict):
+            kwargs['prediction'] = safe_json_dumps(kwargs['prediction'])
+        super().__init__(**kwargs)
+
     __tablename__ = "prediction_history"
 
     id = Column(Integer, primary_key=True, index=True)
     model_name = Column(String, nullable=False)
-    input_features = Column(JSON)
-    prediction = Column(JSON)
+    input_features = Column(String)
+    prediction = Column(String)
     actual_outcome = Column(String, nullable=True)
     confidence_score = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -116,7 +177,7 @@ class HealingAction(Base):
     status = Column(String, default="pending")
     triggered_by = Column(String)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    details = Column(JSON, nullable=True)
+    details = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     
@@ -131,7 +192,7 @@ class AuditLog(Base):
     username = Column(String, nullable=True)
     action = Column(String, nullable=False)
     resource = Column(String, nullable=False)
-    details = Column(JSON, nullable=True)
+    details = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

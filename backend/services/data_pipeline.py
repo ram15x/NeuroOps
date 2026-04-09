@@ -13,7 +13,7 @@ SAMPLE_SIZE = 500
 
 
 def run_metrics_pipeline() -> dict:
-    df = pd.read_csv(METRICS_PATH)
+    df = pd.read_sql("SELECT timestamp, metric_name, value FROM metric_history WHERE metric_name='cpu'", engine)
 
     # sample recent rows
     df = df.tail(SAMPLE_SIZE)
@@ -53,7 +53,7 @@ def run_metrics_pipeline() -> dict:
 
 
 def run_failure_pipeline() -> dict:
-    df = pd.read_csv(FAILURE_PATH)
+    df = pd.read_sql("SELECT timestamp, value FROM metric_history WHERE metric_name='cpu'", engine)
     df = df.tail(SAMPLE_SIZE)
 
     sensor_cols = [c for c in df.columns if c.startswith("sensor")]
@@ -67,7 +67,7 @@ def run_failure_pipeline() -> dict:
     features["avg_cycle"]     = round(float(df["cycle"].mean()), 2)
 
     store_features(
-        entity_id   = "turbofan_fleet",
+        entity_id   = "aws_ec2_fleet",
         entity_type = "sensor_fleet",
         features    = features
     )
@@ -82,7 +82,7 @@ def run_failure_pipeline() -> dict:
 
 def run_drift_check() -> dict:
     # feed a few recent metric values into drift detector to get current status
-    df      = pd.read_csv(METRICS_PATH).tail(100)
+    # df = pd.read_csv(METRICS_PATH).tail(100)  # Using real AWS data
     values  = df["value"].tolist()
 
     # record prediction in drift detector

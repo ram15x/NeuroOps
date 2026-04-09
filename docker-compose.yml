@@ -1,58 +1,45 @@
 version: '3.8'
 
 services:
-
-  # ── PostgreSQL ─────────────────────────────────────
-  postgres:
-    image: postgres:15
-    container_name: neuroops_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: neuroops123
-      POSTGRES_DB: neuroops_db
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Redis ──────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: neuroops_redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── FastAPI Backend ────────────────────────────────
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: neuroops_backend
+  neuroops:
+    build: .
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://postgres:neuroops123@postgres:5432/neuroops_db
-      REDIS_URL: redis://redis:6379
-    volumes:
-      - .:/app
-      - ./ml_models:/app/ml_models
-      - ./datasets:/app/datasets
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=neuroops_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=neuroops_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
 
 volumes:
   postgres_data:
+  redis_data:

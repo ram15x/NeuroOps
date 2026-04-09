@@ -143,8 +143,8 @@ def predict_failure_from_status(
                 action = "System operating normally."
             
             result = {
-                "will_fail_soon": will_fail,
-                "failure_probability": fail_prob,
+                "will_fail_soon": bool(will_fail),
+                "failure_probability": float(fail_prob),
                 "risk_level": risk,
                 "action": action,
                 "input_metrics": {

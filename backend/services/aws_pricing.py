@@ -19,7 +19,7 @@ def get_pricing_client():
         "pricing",
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name="us-east-1"  # Pricing API only works in us-east-1
+        region_name=settings.AWS_REGION  # Pricing API only works in us-east-1
     )
 
 

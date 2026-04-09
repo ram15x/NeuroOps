@@ -200,3 +200,9 @@ async def get_latest_metrics(db: Session = Depends(get_db)):
         "timestamp": datetime.utcnow().isoformat(),
         "source": "auto-refresh"
     }
+# Redirect old endpoint to new one (backward compatibility)
+@router.get("/streaming/latest-metrics")
+async def old_latest_metrics_redirect(db: Session = Depends(get_db)):
+    """Redirect old endpoint to new one"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/v1/latest-metrics", status_code=308)

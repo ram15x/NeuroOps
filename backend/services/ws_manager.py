@@ -7,13 +7,13 @@ class ConnectionManager:
         self.active_connections: List[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
-        await websocket.accept()
+       # await websocket.accept()
         self.active_connections.append(websocket)
-        print(f"Client connected! Total: {len(self.active_connections)}")
+        logger.info(f"Client connected! Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
-        print(f"Client disconnected! Total: {len(self.active_connections)}")
+        logger.info(f"Client disconnected! Total: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
         disconnected = []

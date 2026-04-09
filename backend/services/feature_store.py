@@ -1,3 +1,4 @@
+from typing import Optional, List, Dict, Any
 import json
 from datetime import datetime
 from backend.services.redis_service import redis_client
@@ -32,7 +33,7 @@ def store_features(entity_id: str, features: dict, entity_type: str = "unknown")
     return record
 
 
-def get_latest_features(entity_id: str) -> dict | None:
+def get_latest_features(entity_id: str) -> Optional[dict]:
     key    = f"features:{entity_id}:latest"
     cached = redis_client.get(key)
     if not cached:

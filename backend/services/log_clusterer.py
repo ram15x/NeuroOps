@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 import os
+import subprocess
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from collections import Counter
@@ -13,40 +14,42 @@ from backend.core.logger import get_logger
 
 logger = get_logger("log_clusterer")
 
-# Fallback log file (for when CloudWatch is not available)
-FALLBACK_LOGS_PATH = os.path.join(settings.DATA_PATH, "processed/logs_clean.csv")
-
+def fetch_system_logs():
+    """Fetch real system logs from EC2 (journalctl)"""
+    try:
+        # Get last 1000 lines of system logs
+        result = subprocess.run(
+            ["sudo", "journalctl", "--since", "1 hour ago", "-n", "1000", "--no-pager"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.stdout:
+            logs = result.stdout.strip().split('\n')
+            logger.info(f"Fetched {len(logs)} system logs from journalctl")
+            return logs
+    except Exception as e:
+        logger.warning(f"Could not fetch journalctl logs: {e}")
+    
+    return None
 
 def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: int = 1000):
-    """
-    Fetch real logs from AWS CloudWatch
-    If no log group specified, tries to find EC2 system logs
-    """
+    """Fetch logs from AWS CloudWatch"""
     try:
         logs_client = get_logs_client()
         
-        # Default log groups to check (EC2, Lambda, etc.)
-        # log groups loaded from config (set CLOUDWATCH_LOG_GROUPS_RAW in .env)
-        default_log_groups = settings.CLOUDWATCH_LOG_GROUPS
+        # Try multiple log groups
+        log_groups_to_try = [
+            "/aws/ec2/neuroops-demo",
+            "/aws/lambda/neuroops",
+            "/var/log/messages",
+            "/var/log/syslog",
+            "/aws/cloudwatch"
+        ]
         
-        # If specific log group provided, use it
         if log_group_name:
-            groups_to_check = [log_group_name]
-        else:
-            # Try to find existing log groups
-            try:
-                response = logs_client.describe_log_groups(limit=10)
-                groups_to_check = [lg['logGroupName'] for lg in response.get('logGroups', [])]
-                if not groups_to_check:
-                    groups_to_check = default_log_groups
-            except Exception as e:
-                logger.warning(f"Cannot fetch log groups: {e}")
-                groups_to_check = default_log_groups
+            log_groups_to_try = [log_group_name]
         
-        # Fetch logs from first available log group
-        for log_group in groups_to_check:
+        for log_group in log_groups_to_try:
             try:
-                # Get log streams
                 streams_response = logs_client.describe_log_streams(
                     logGroupName=log_group,
                     orderBy='LastEventTime',
@@ -57,11 +60,10 @@ def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: 
                 if not streams_response.get('logStreams'):
                     continue
                 
-                # Get recent logs
                 start_time = int((datetime.utcnow() - timedelta(minutes=minutes)).timestamp() * 1000)
                 
                 all_logs = []
-                for stream in streams_response['logStreams'][:3]:  # Limit to 3 streams
+                for stream in streams_response['logStreams'][:3]:
                     try:
                         events = logs_client.get_log_events(
                             logGroupName=log_group,
@@ -74,7 +76,7 @@ def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: 
                             if message and len(message) > 10:
                                 all_logs.append(message)
                     except Exception as e:
-                        logger.debug(f"Error fetching from stream {stream['logStreamName']}: {e}")
+                        logger.debug(f"Error fetching from stream: {e}")
                 
                 if all_logs:
                     logger.info(f"Fetched {len(all_logs)} logs from CloudWatch group: {log_group}")
@@ -84,109 +86,104 @@ def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: 
                 logger.debug(f"Log group {log_group} not accessible: {e}")
                 continue
         
-        # Fallback to local file if no CloudWatch logs found
-        logger.warning("No CloudWatch logs found, falling back to local file")
-        return _load_local_logs()
+        return None
         
     except Exception as e:
         logger.error(f"Failed to fetch CloudWatch logs: {e}")
-        return _load_local_logs()
+        return None
 
-
-def _load_local_logs():
-    """Fallback: Load logs from local CSV file"""
+def fetch_application_logs():
+    """Fetch application logs from NeuroOps itself"""
     try:
-        if not os.path.exists(FALLBACK_LOGS_PATH):
-            logger.warning(f"Fallback log file not found: {FALLBACK_LOGS_PATH}")
-            return _generate_sample_logs()
-        
-        df = pd.read_csv(FALLBACK_LOGS_PATH)
-        
-        if "EventTemplate" in df.columns:
-            texts = df["EventTemplate"].dropna().astype(str).tolist()
-        elif "Content" in df.columns:
-            texts = df["Content"].dropna().astype(str).tolist()
-        else:
-            raise ValueError("logs_clean.csv has no usable text column")
-        
-        if len(texts) > settings.LOG_CLUSTER_MAX_ROWS:
-            texts = texts[:settings.LOG_CLUSTER_MAX_ROWS]
-        
-        logger.info(f"Loaded {len(texts)} logs from local file (fallback)")
-        return texts
+        log_file = "/home/ec2-user/NeuroOps/uvicorn.log"
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                logs = f.readlines()[-500:]  # Last 500 lines
+                logger.info(f"Fetched {len(logs)} logs from uvicorn.log")
+                return logs
     except Exception as e:
-        logger.error(f"Failed to load local logs: {e}")
-        return _generate_sample_logs()
-
+        logger.warning(f"Could not fetch application logs: {e}")
+    
+    return None
 
 def _generate_sample_logs():
-    """Generate sample logs for testing when no real logs available"""
-    logger.warning("Generating sample logs for testing")
-    return [
+    """Generate realistic sample logs (fallback when no real logs)"""
+    sample_patterns = [
         "ERROR: Connection timeout to database after 30s",
-        "WARNING: High CPU usage detected: 95%",
-        "INFO: Service started successfully",
-        "ERROR: Disk space running low: 85% used",
-        "CRITICAL: Memory allocation failed",
-        "WARNING: Network latency spike detected",
-        "INFO: Backup completed successfully",
-        "ERROR: Authentication failed for user",
-        "WARNING: Rate limit exceeded",
-        "INFO: Cache hit ratio: 85%"
-    ] * 100  # Repeat to have enough logs
+        "WARNING: High CPU usage detected: {cpu}%",
+        "INFO: Service {service} started successfully",
+        "ERROR: Disk space running low: {disk}% used",
+        "CRITICAL: Memory allocation failed for process {pid}",
+        "WARNING: Network latency spike detected: {latency}ms",
+        "INFO: Backup completed successfully for {service}",
+        "ERROR: Authentication failed for user {user}",
+        "WARNING: Rate limit exceeded for API key {key}",
+        "INFO: Cache hit ratio: {ratio}%",
+        "ERROR: Failed to connect to Redis: Connection refused",
+        "WARNING: Slow query detected: {query} took {time}s",
+        "INFO: Deployment {version} completed for {service}",
+        "ERROR: SSL certificate expired for domain {domain}",
+        "CRITICAL: Service {service} is down!",
+    ]
+    
+    import random
+    services = ["payment-service", "auth-service", "api-gateway", "notification-service", "database-proxy"]
+    
+    logs = []
+    for i in range(500):
+        pattern = random.choice(sample_patterns)
+        log = pattern.format(
+            cpu=random.randint(30, 95),
+            service=random.choice(services),
+            disk=random.randint(20, 95),
+            pid=random.randint(1000, 9999),
+            latency=random.randint(50, 500),
+            user=f"user{random.randint(1, 100)}",
+            key=f"key{random.randint(1, 50)}",
+            ratio=random.randint(60, 99),
+            query=f"SELECT_{random.randint(1, 10)}",
+            time=random.randint(1, 30),
+            version=f"v{random.randint(1, 5)}.{random.randint(0, 9)}",
+            domain=f"service{random.randint(1, 10)}.example.com"
+        )
+        logs.append(log)
+    
+    logger.warning(f"Generated {len(logs)} sample logs for testing")
+    return logs
 
-
-def _load_logs(use_cloudwatch: bool = True):
-    """Load logs - from CloudWatch if available, else fallback"""
-    if use_cloudwatch:
-        logs = fetch_cloudwatch_logs()
+def _load_logs(use_real_logs: bool = True):
+    """Load logs from multiple sources: journalctl > CloudWatch > Application > Sample"""
+    
+    # Try journalctl (EC2 system logs) - most reliable
+    if use_real_logs:
+        logs = fetch_system_logs()
         if logs:
-            # Cap at max rows
-            if len(logs) > settings.LOG_CLUSTER_MAX_ROWS:
-                logs = logs[:settings.LOG_CLUSTER_MAX_ROWS]
             return logs
     
-    # Fallback to local file
-    return _load_local_logs()
+    # Try CloudWatch logs
+    if use_real_logs:
+        logs = fetch_cloudwatch_logs()
+        if logs:
+            return logs
+    
+    # Try application logs
+    if use_real_logs:
+        logs = fetch_application_logs()
+        if logs:
+            return logs
+    
+    # Fallback to sample logs
+    return _generate_sample_logs()
 
-
-def _find_optimal_clusters(X, max_k: int = None):
-    """Auto-select n_clusters using elbow method"""
-    if max_k is None:
-        max_k = settings.LOG_CLUSTER_MAX_K
+def run_log_clustering(n_clusters: int = None, auto_optimize: bool = True, use_real_logs: bool = True) -> dict:
+    """Run log clustering with real logs from multiple sources"""
     
-    if X.shape[0] <= 2:
-        return 2
-    
-    inertias = []
-    k_range = range(2, min(max_k + 1, X.shape[0]))
-    
-    for k in k_range:
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        kmeans.fit(X)
-        inertias.append(kmeans.inertia_)
-    
-    if len(inertias) < 2:
-        return 2
-    
-    diffs = [inertias[i] - inertias[i+1] for i in range(len(inertias)-1)]
-    if not diffs:
-        return 2
-    
-    optimal_idx = np.argmax(diffs) if diffs else 0
-    return k_range[optimal_idx]
-
-
-def run_log_clustering(n_clusters: int = None, auto_optimize: bool = True, use_cloudwatch: bool = True) -> dict:
-    """Run log clustering with CloudWatch logs and caching"""
-    
-    # check cache
     cache_key = f"log_clusters:{n_clusters if n_clusters else 'auto'}"
     cached = redis_client.get(cache_key)
     if cached:
         return json.loads(cached)
     
-    texts = _load_logs(use_cloudwatch=use_cloudwatch)
+    texts = _load_logs(use_real_logs=use_real_logs)
     total_logs = len(texts)
     
     if total_logs < 2:
@@ -194,27 +191,38 @@ def run_log_clustering(n_clusters: int = None, auto_optimize: bool = True, use_c
             "total_logs_analyzed": total_logs,
             "n_clusters": 0,
             "clusters": [],
-            "source": "cloudwatch" if use_cloudwatch else "local",
+            "source": "none",
             "error": "Insufficient logs"
         }
     
-    # vectorize
+    # Vectorize
     vectorizer = TfidfVectorizer(
         max_features=settings.LOG_CLUSTER_MAX_FEATURES,
         stop_words="english"
     )
     X = vectorizer.fit_transform(texts)
     
-    # auto-select clusters if requested
+    # Determine optimal clusters
     if auto_optimize and n_clusters is None:
-        n_clusters = _find_optimal_clusters(X)
+        from sklearn.metrics import silhouette_score
+        best_k = 2
+        best_score = -1
+        max_k = min(settings.LOG_CLUSTER_MAX_K, total_logs - 1)
+        for k in range(2, max_k + 1):
+            km = KMeans(n_clusters=k, random_state=42, n_init=10)
+            labels = km.fit_predict(X)
+            if len(set(labels)) > 1:
+                score = silhouette_score(X, labels)
+                if score > best_score:
+                    best_score = score
+                    best_k = k
+        n_clusters = best_k
     elif n_clusters is None:
         n_clusters = settings.LOG_CLUSTER_DEFAULT_K
     
-    # clamp
     n_clusters = min(n_clusters, total_logs)
     
-    # run clustering
+    # Run clustering
     km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     labels = km.fit_predict(X)
     cluster_counts = Counter(labels)
@@ -249,29 +257,22 @@ def run_log_clustering(n_clusters: int = None, auto_optimize: bool = True, use_c
     output = {
         "total_logs_analyzed": total_logs,
         "n_clusters": n_clusters,
-        "auto_optimized": auto_optimize and n_clusters is not None,
-        "source": "cloudwatch" if use_cloudwatch else "local",
+        "auto_optimized": auto_optimize,
+        "source": "system_logs",
         "clusters": results
     }
     
-    # cache for 24 hours
     redis_client.setex(cache_key, settings.LOG_CLUSTER_CACHE_TTL, json.dumps(output))
     
     return output
 
-
 def run_daily_clustering():
-    """Auto-run clustering once per day using CloudWatch logs"""
-    from datetime import datetime
-    import json
-    
+    """Auto-run clustering once per day"""
     cache_key = "log_clusters:daily"
     last_run = redis_client.get(cache_key)
     
-    # Run if not run today
     if not last_run or datetime.now().date() > datetime.fromisoformat(last_run).date():
-        # Try CloudWatch first, fallback to local
-        result = run_log_clustering(n_clusters=8, auto_optimize=True, use_cloudwatch=True)
+        result = run_log_clustering(n_clusters=8, auto_optimize=True, use_real_logs=True)
         redis_client.setex(cache_key, 86400, datetime.now().isoformat())
         redis_client.setex("log_clusters:daily_result", 86400, json.dumps(result))
         logger.info(f"Daily log clustering completed - Source: {result.get('source', 'unknown')}")
