@@ -1,0 +1,29 @@
+[1mdiff --git a/requirements.txt b/requirements.txt[m
+[1mindex f61a92f..43d8ed3 100644[m
+[1m--- a/requirements.txt[m
+[1m+++ b/requirements.txt[m
+[36m@@ -12,7 +12,6 @@[m [mredis[m
+ alembic[m
+ python-dotenv[m
+ websockets[m
+[31m-ollama[m
+ python-jose[cryptography][m
+ passlib[bcrypt]==1.7.4[m
+ bcrypt==4.0.1[m
+[36m@@ -24,12 +23,11 @@[m [mstructlog[m
+ pytest==7.4.3[m
+ pytest-asyncio==0.21.1[m
+ pytest-cov==4.1.0[m
+[31m-httpx==0.25.1[m
+[32m+[m[32mhttpx>=0.27.0[m
+ boto3==1.28.61[m
+ botocore==1.31.61[m
+[31m-tensorflow==2.13.0[m
+ xgboost==2.0.2[m
+ pytest==7.4.3[m
+ pytest-asyncio==0.21.1[m
+ pytest-cov==4.1.0[m
+[31m-httpx==0.25.1[m
+\ No newline at end of file[m
+[32m+[m[32mhttpx>=0.27.0[m
+\ No newline at end of file[m

@@ -1,0 +1,59 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from backend.api import streaming, incidents, aws
+from backend.core.config import settings
+from backend.core.logger import get_logger
+from backend.services.metrics_analyzer import start_metrics_analyzer
+import os
+
+logger = get_logger(__name__)
+
+app = FastAPI(title="NeuroOps", version="2.0.0")
+
+# CORS - single configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static dashboard
+if os.path.exists("dashboard"):
+    app.mount("/dashboard", StaticFiles(directory="dashboard", html=True), name="dashboard")
+
+# Include routers
+app.include_router(streaming.router, prefix="/api/v1", tags=["Streaming"])
+app.include_router(incidents.router, prefix="/api/v1", tags=["Incidents"])
+app.include_router(aws.router, prefix="/api/v1", tags=["AWS"])
+
+# Import other routers
+from backend.api import auth, inframind, opsgpt, failure, scalewise, autohealing, buildsense, deployguard, registry, rootcause
+app.include_router(auth.router, prefix="/api/v1", tags=["Auth"])
+app.include_router(inframind.router, prefix="/api/v1", tags=["InfraMind"])
+app.include_router(opsgpt.router, prefix="/api/v1", tags=["OpsGPT"])
+app.include_router(failure.router, prefix="/api/v1", tags=["Failure"])
+app.include_router(scalewise.router, prefix="/api/v1", tags=["ScaleWise"])
+app.include_router(autohealing.router, prefix="/api/v1", tags=["AutoHeal"])
+app.include_router(buildsense.router, prefix="/api/v1", tags=["BuildSense"])
+app.include_router(deployguard.router, prefix="/api/v1", tags=["DeployGuard"])
+app.include_router(registry.router, prefix="/api/v1", tags=["Registry"])
+app.include_router(rootcause.router, prefix="/api/v1", tags=["RootCause"])
+
+@app.on_event("startup")
+async def startup():
+    logger.info(f"NeuroOps v{settings.APP_VERSION} started")
+    start_metrics_analyzer()
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+@app.get("/")
+async def root():
+    return {"platform": "NeuroOps", "version": "2.0.0", "api": "/api/v1", "docs": "/docs"}
