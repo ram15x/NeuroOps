@@ -24,4 +24,4 @@ neuroops_env\Scripts\activate
 uvicorn backend.main:app --reload
 ```
 
-API docs: http://127.0.0.1:8000/docs
+API docs: http://127.0.0.1:8000/docs# CI/CD Test Thu Apr  9 14:18:03 UTC 2026
