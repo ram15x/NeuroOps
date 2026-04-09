@@ -40,7 +40,7 @@ class HybridRootCauseAnalyzer:
         }
 
     def get_shap_explanation(self, model, feature_vector, feature_names):
-        """Get SHAP explanation for ML prediction"""
+        """Get SHAP explanation for ML prediction - DOUBT #1"""
         try:
             import shap
             explainer = shap.TreeExplainer(model)
@@ -123,16 +123,18 @@ class HybridRootCauseAnalyzer:
                 probability = max(self.model.predict_proba(feature_vector)[0])
                 confidence = int(probability * 100)
                 
+                # DOUBT #1: Record for drift detection
                 is_anomaly = prediction != "normal_variation"
                 record_prediction(is_anomaly)
                 
+                # DOUBT #1: Get SHAP explanation
                 shap_explanation = self.get_shap_explanation(self.model, feature_vector, feature_names)
 
                 return {
                     "alert_id": alert_id,
                     "root_cause": prediction,
                     "confidence": confidence,
-                    "why": shap_explanation,
+                    "why": shap_explanation,  # DOUBT #1: SHAP output
                     "method": "ml_model_with_shap",
                     "features": {
                         "cpu_start": round(features['start'], 1),
@@ -145,13 +147,16 @@ class HybridRootCauseAnalyzer:
                 print(f"ML failed: {e}")
                 result = self.rule_based_analysis(features)
                 result["method"] = "rule_based_fallback"
+                result["alert_id"] = alert_id
                 return result
         else:
             result = self.rule_based_analysis(features)
             result["method"] = "rule_based"
+            result["alert_id"] = alert_id
             return result
 
     def train(self, training_data_file):
+        """Train the model on labeled data"""
         import pandas as pd
         df = pd.read_csv(training_data_file)
         feature_cols = ['cpu_start', 'cpu_end', 'cpu_max', 'cpu_increase', 'cpu_std']
@@ -161,5 +166,5 @@ class HybridRootCauseAnalyzer:
         self.model.fit(X, y)
         with open('root_cause_model.pkl', 'wb') as f:
             pickle.dump(self.model, f)
-        print(f"Model trained on {len(df)} samples")
+        print(f"✅ Model trained on {len(df)} samples")
         return True
