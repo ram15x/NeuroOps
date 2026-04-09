@@ -95,7 +95,7 @@ def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: 
 def fetch_application_logs():
     """Fetch application logs from NeuroOps itself"""
     try:
-        log_file = "/home/ec2-user/NeuroOps/uvicorn.log"
+        log_file = os.path.join(settings.LOGS_DIR, "uvicorn.log")
         if os.path.exists(log_file):
             with open(log_file, 'r') as f:
                 logs = f.readlines()[-500:]  # Last 500 lines

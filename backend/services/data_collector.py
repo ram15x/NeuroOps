@@ -13,8 +13,7 @@ from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Training data paths
-TRAINING_DATA_DIR = "/home/ec2-user/NeuroOps/training_data"
+TRAINING_DATA_DIR = os.path.join(settings.DATA_DIR, "training_data")
 os.makedirs(TRAINING_DATA_DIR, exist_ok=True)
 
 def collect_training_data(db: Session, days: int = 30):
