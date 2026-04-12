@@ -993,8 +993,8 @@
             <div class="stat-card"><div class="stat-label">anomalies / 24h</div><div class="stat-value red" id="stat-anomalies">0</div><div class="stat-meta">live detection</div></div>
             <div class="stat-card"><div class="stat-label">system health</div><div class="stat-value green" id="stat-health">healthy</div><div class="stat-meta">overall status</div></div>
             <div class="stat-card"><div class="stat-label">ml models</div><div class="stat-value purple">6</div><div class="stat-meta">hybrid ml + z-score</div></div>
-            <div class="stat-card"><div class="stat-label">api endpoints</div><div class="stat-value" style="color:var(--cyan)">30+</div><div class="stat-meta">all modules active</div></div>
-            <div class="stat-card"><div class="stat-label">modules online</div><div class="stat-value green">8</div><div class="stat-meta">all systems go</div></div>
+            <div class="stat-card"><div class="stat-label">api endpoints</div><div class="stat-value" style="color:var(--cyan)">85+</div><div class="stat-meta">all modules active</div></div>
+            <div class="stat-card"><div class="stat-label">modules online</div><div class="stat-value green">11</div><div class="stat-meta">all systems go</div></div>
         </div>
         
         <div class="grid-2" style="margin-bottom: 20px;">
@@ -1672,9 +1672,9 @@ async function runDrift() { setLoadingWithSpinner("drift-result"); try { const d
 async function runOpsGPT() { setLoadingWithSpinner("ops-result", "analyzing log..."); try { const result = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); if (result.error) { setBox("ops-result", result.error, "error"); } else { setBox("ops-result", result, result.severity === "critical" ? "error" : ""); } } catch(e) { setBox("ops-result", e.message, "error"); } }
 async function runClusters() { setLoadingWithSpinner("cluster-result"); try { const n = parseInt(document.getElementById("n-clusters").value); const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n }); const summary = data.clusters.map(c => `cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  keywords: ${c.top_keywords.join(", ")}`).join("\n\n"); setBox("cluster-result", `total logs: ${data.total_logs_analyzed} | clusters: ${data.n_clusters}\n\n${summary}`); } catch(e) { setBox("cluster-result", e.message, "error"); } }
 
-async function runFailure() { 
-    setLoadingWithSpinner("fail-result"); 
-    try { 
+async function runFailure() {
+    setLoadingWithSpinner("fail-result");
+    try {
         const payload = getSensorPayload(document.getElementById("unit-id").value);
         const data = await post(`${API}/failure/predict`, {
             instance_id: payload.unit_id,
@@ -1685,12 +1685,16 @@ async function runFailure() {
             status_check_ok: payload.status_check_ok,
             recent_reboots: payload.recent_reboots
         });
-        setBox("fail-result", data, data.will_fail_soon ? "error" : ""); 
-        showToast(`Failure probability: ${data.failure_probability}%`, data.risk_level.toLowerCase(), `⚠️ FAILURE PREDICTION`); 
+        setBox("fail-result", data, data.will_fail_soon ? "error" : "");
+        showToast(
+            `Failure probability: ${data.failure_probability}%`,
+            (data.risk_level || 'normal').toLowerCase(),
+            `⚠️ FAILURE PREDICTION`
+        );
         updateAutoFailureStats(data);
-    } catch(e) { 
-        setBox("fail-result", e.message, "error"); 
-    } 
+    } catch(e) {
+        setBox("fail-result", e.message, "error");
+    }
 }
 
 async function runCountdown() { 
