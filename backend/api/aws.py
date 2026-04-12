@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 import json
-
+from backend.core.config import settings
 from backend.services.redis_service import redis_client
 from datetime import datetime
 from backend.services.aws_service import get_ec2_status_checks
