@@ -1650,7 +1650,31 @@ async function checkAuth() {
 }
 
 async function checkAWSStatus() { try { const res = await fetch(`${API}/aws/status`); const data = await res.json(); document.getElementById("aws-status-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-status-result").textContent = `Error: ${e.message}`; } }
-async function fetchAWSMetrics() { const token = localStorage.getItem("neuroops_token"); const instance_id = document.getElementById("aws-instance-id").value || document.getElementById("aws-instance-id").placeholder; const minutes = parseInt(document.getElementById("aws-minutes").value); try { const res = await fetch(`${API}/aws/fetch-metrics`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ instance_id, minutes }) }); const data = await res.json(); document.getElementById("aws-metrics-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-metrics-result").textContent = `Error: ${e.message}`; } }
+async function fetchAWSMetrics() { 
+    const token = localStorage.getItem("neuroops_token"); 
+    const instance_id = document.getElementById("aws-instance-id").value || document.getElementById("aws-instance-id").placeholder; 
+    const minutes = parseInt(document.getElementById("aws-minutes").value) || 60; 
+    
+    if (!instance_id || instance_id.length < 10) {
+        document.getElementById("aws-metrics-result").textContent = JSON.stringify({ error: "Invalid instance ID" }, null, 2);
+        return;
+    }
+    
+    try { 
+        const res = await fetch(`${API}/aws/fetch-metrics`, { 
+            method: "POST", 
+            headers: { 
+                "Content-Type": "application/json", 
+                "Authorization": `Bearer ${token}` 
+            }, 
+            body: JSON.stringify({ instance_id, minutes }) 
+        }); 
+        const data = await res.json(); 
+        document.getElementById("aws-metrics-result").textContent = JSON.stringify(data, null, 2); 
+    } catch(e) { 
+        document.getElementById("aws-metrics-result").textContent = `Error: ${e.message}`; 
+    } 
+}
 async function listEC2Instances() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/instances`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-instances-result").textContent = JSON.stringify(data, null, 2); if (data.instances && data.instances.length > 0) { currentInstanceId = data.instances[0].instance_id; } } catch(e) { document.getElementById("aws-instances-result").textContent = `Error: ${e.message}`; } }
 async function uploadModel() { const token = localStorage.getItem("neuroops_token"); const local_path = document.getElementById("aws-local-path").value || document.getElementById("aws-local-path").placeholder; const s3_key = document.getElementById("aws-s3-key").value || document.getElementById("aws-s3-key").placeholder; try { const res = await fetch(`${API}/aws/upload-model`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ local_path, s3_key }) }); const data = await res.json(); document.getElementById("aws-upload-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-upload-result").textContent = `Error: ${e.message}`; } }
 async function listS3Models() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/list-models`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-s3-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-s3-result").textContent = `Error: ${e.message}`; } }
@@ -1810,7 +1834,22 @@ async function runScaleWise() {
         setBox("sw-result", e.message, "error"); 
     } 
 }
-async function runPricing() { setLoadingWithSpinner("pricing-result"); try { const data = await get(`${API}/scalewise/pricing`); setBox("pricing-result", data); } catch(e) { setBox("pricing-result", e.message, "error"); } }
+async function runPricing() { 
+    setLoading("pricing-result"); 
+    try { 
+        const token = localStorage.getItem("neuroops_token");
+        // Force refresh from AWS
+        await fetch(`${API}/scalewise/refresh-pricing`, { 
+            method: "POST", 
+            headers: { "Authorization": `Bearer ${token}` } 
+        });
+        // Then get fresh pricing
+        const data = await get(`${API}/scalewise/pricing?refresh=true`); 
+        setBox("pricing-result", data); 
+    } catch(e) { 
+        setBox("pricing-result", e.message, "error"); 
+    } 
+}
 async function runAutoHealing() { setLoadingWithSpinner("ah-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("heal-service").value, severity: document.getElementById("heal-severity").value, metric_value: parseFloat(document.getElementById("heal-metric").value), reason: "triggered from dashboard" }); setBox("ah-result", data); showToast(`${data.action} triggered for ${data.service}`, data.severity, `🛠️ AUTO-HEALING`); } catch(e) { setBox("ah-result", e.message, "error"); } }
 async function loadHealingRules() { setLoadingWithSpinner("rules-result"); try { const data = await get(`${API}/autohealing/rules`); setBox("rules-result", data); } catch(e) { setBox("rules-result", e.message, "error"); } }
 async function runPipeline() { setLoadingWithSpinner("pipeline-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("pipe-service").value, metric_value: parseFloat(document.getElementById("pipe-metric").value), severity: document.getElementById("pipe-severity").value, log: "dashboard triggered pipeline" }); setBox("pipeline-result", data); } catch(e) { setBox("pipeline-result", e.message, "error"); } }

@@ -80,6 +80,10 @@ async def metric_stream(websocket: WebSocket):
                     disk_key = f"disk:{instance_id}"
                     memory_value = redis_client.get(memory_key)
                     disk_value = redis_client.get(disk_key)
+                    if not memory_value:
+                        memory_value = metrics.get("mem_used_percent", [{}])[-1].get("value", 0) if metrics.get("mem_used_percent") else 0
+                    if not disk_value:
+                        disk_value = metrics.get("disk_used_percent", [{}])[-1].get("value", 0) if metrics.get("disk_used_percent") else 0
                     
                     # Get failure prediction
                     failure_key = f"failure_prediction:{instance_id}"

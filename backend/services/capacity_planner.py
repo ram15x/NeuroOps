@@ -185,14 +185,12 @@ class CapacityPlanner:
 
 
 def get_capacity_report(instance_id: str) -> dict:
-    """Generate full capacity report for an instance"""
-    planner = CapacityPlanner(instance_id)
+    # ... existing code ...
     
-    return {
-        "instance_id": instance_id,
-        "timestamp": datetime.utcnow().isoformat(),
-        "instance_need": planner.predict_instance_need(),
-        "cpu": planner.predict_cpu_trend(),
-        "memory": planner.predict_memory_trend(),
-        "disk": planner.predict_disk_trend()
-    }
+    if len(metrics) < 100:
+        return {
+            "instance_id": instance_id,
+            "cpu": {"current_avg": 0, "growth_rate_per_day": 0, "days_until_80_percent": None},
+            "memory": {"current": 0, "growth_rate_per_day": 0, "days_until_90_percent": None},
+            "instance_need": {"recommendation": "Collecting data - check back in 7 days"}
+        }

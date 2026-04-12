@@ -65,15 +65,11 @@ def predict_rul(cpu_usage: float, memory_usage: float = 50.0, instance_age_days:
         
         # Build features based on what the model actually expects
         if expected_features == 7:
-            features = np.array([[
-                cpu_usage, memory_usage, disk_val, instance_age_days,
-                cpu_trend, cpu_std, memory_trend
-            ]])
+            features = np.array([[float(cpu_usage), float(memory_usage), float(disk_val), float(instance_age_days),
+                          float(cpu_trend), float(cpu_std), float(memory_trend)]])
         elif expected_features == 5:
-            # Current model on disk: CPU, Memory, Age, Trend, Std
-            features = np.array([[
-                cpu_usage, memory_usage, instance_age_days, cpu_trend, cpu_std
-            ]])
+            features = np.array([[float(cpu_usage), float(memory_usage), float(instance_age_days), 
+                          float(cpu_trend), float(cpu_std)]])
         elif expected_features == 4:
             features = np.array([[cpu_usage, memory_usage, disk_val, instance_age_days]])
         elif expected_features == 3:

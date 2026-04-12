@@ -91,70 +91,49 @@ def fetch_cloudwatch_metrics(instance_id: str, minutes: int = 60) -> dict:
     fetch cpu, network in/out, disk read/write for a given ec2 instance.
     returns a dict with metric name -> list of (timestamp, value) datapoints.
     """
-    client    = get_cloudwatch_client()
-    end_time  = datetime.utcnow()
+    try:
+        client = get_cloudwatch_client()
+    except Exception as e:
+        logger.error(f"Failed to get CloudWatch client: {e}")
+        return {
+            "CPUUtilization": [],
+            "NetworkIn": [],
+            "NetworkOut": [],
+            "DiskReadBytes": [],
+            "DiskWriteBytes": []
+        }
+    
+    end_time = datetime.utcnow()
     start_time = end_time - timedelta(minutes=minutes)
 
     metric_queries = [
-        {
-            "name"      : "CPUUtilization",
-            "namespace" : "AWS/EC2",
-            "stat"      : "Average",
-            "unit"      : "Percent",
-        },
-        {
-            "name"      : "NetworkIn",
-            "namespace" : "AWS/EC2",
-            "stat"      : "Sum",
-            "unit"      : "Bytes",
-        },
-        {
-            "name"      : "NetworkOut",
-            "namespace" : "AWS/EC2",
-            "stat"      : "Sum",
-            "unit"      : "Bytes",
-        },
-        {
-            "name"      : "DiskReadBytes",
-            "namespace" : "AWS/EC2",
-            "stat"      : "Sum",
-            "unit"      : "Bytes",
-        },
-        {
-            "name"      : "DiskWriteBytes",
-            "namespace" : "AWS/EC2",
-            "stat"      : "Sum",
-            "unit"      : "Bytes",
-        },
+        {"name": "CPUUtilization", "namespace": "AWS/EC2", "stat": "Average", "unit": "Percent"},
+        {"name": "NetworkIn", "namespace": "AWS/EC2", "stat": "Sum", "unit": "Bytes"},
+        {"name": "NetworkOut", "namespace": "AWS/EC2", "stat": "Sum", "unit": "Bytes"},
+        {"name": "DiskReadBytes", "namespace": "AWS/EC2", "stat": "Sum", "unit": "Bytes"},
+        {"name": "DiskWriteBytes", "namespace": "AWS/EC2", "stat": "Sum", "unit": "Bytes"},
     ]
 
     results = {}
-
     for mq in metric_queries:
         try:
             response = client.get_metric_statistics(
-                Namespace  = mq["namespace"],
-                MetricName = mq["name"],
-                Dimensions = [{"Name": "InstanceId", "Value": instance_id}],
-                StartTime  = start_time,
-                EndTime    = end_time,
-                Period     = 300,  # 5-minute intervals
-                Statistics = [mq["stat"]],
-                Unit       = mq["unit"],
+                Namespace=mq["namespace"],
+                MetricName=mq["name"],
+                Dimensions=[{"Name": "InstanceId", "Value": instance_id}],
+                StartTime=start_time,
+                EndTime=end_time,
+                Period=300,
+                Statistics=[mq["stat"]],
+                Unit=mq["unit"],
             )
-            datapoints = sorted(
-                response.get("Datapoints", []),
-                key=lambda x: x["Timestamp"]
-            )
+            datapoints = sorted(response.get("Datapoints", []), key=lambda x: x["Timestamp"])
             results[mq["name"]] = [
-                {
-                    "timestamp" : dp["Timestamp"].isoformat(),
-                    "value"     : dp[mq["stat"]],
-                }
+                {"timestamp": dp["Timestamp"].isoformat(), "value": dp[mq["stat"]]}
                 for dp in datapoints
             ]
         except Exception as e:
-            logger.error(f"cloudwatch fetch failed for {mq['name']}: {e}")
+            logger.warning(f"CloudWatch metric {mq['name']} failed: {e}")
             results[mq["name"]] = []
 
     return results

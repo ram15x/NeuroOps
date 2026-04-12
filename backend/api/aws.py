@@ -55,30 +55,43 @@ def aws_status(request: Request):
 
 
 @router.post("/aws/fetch-metrics")
-@limiter.limit("20/minute")
+@limiter.limit(settings.RATE_LIMIT_POST)
 def fetch_metrics(
-    request : Request,
-    body    : FetchMetricsInput,
-    _       : dict = Depends(get_current_user),
+    request: Request,
+    body: FetchMetricsInput,
+    _: dict = Depends(get_current_user),
 ):
-    """fetch real cloudwatch metrics for an ec2 instance."""
+    """Fetch real CloudWatch metrics for an EC2 instance."""
     try:
+        # Validate instance ID format (starts with 'i-')
+        if not body.instance_id or not body.instance_id.startswith("i-"):
+            return {
+                "source": "error",
+                "error": f"Invalid instance ID format: {body.instance_id}"
+            }
+        
         cache_key = f"aws:metrics:{body.instance_id}:{body.minutes}"
-        cached    = get_cached_alert(cache_key)
+        cached = get_cached_alert(cache_key)
         if cached:
             return {"source": "cache", "data": cached}
 
+        # Fetch metrics - function returns empty arrays on failure
         metrics = fetch_cloudwatch_metrics(body.instance_id, body.minutes)
         cache_alert(cache_key, metrics)
 
         return {
-            "source"      : "live",
-            "instance_id" : body.instance_id,
-            "minutes"     : body.minutes,
-            "data"        : metrics,
+            "source": "live",
+            "instance_id": body.instance_id,
+            "minutes": body.minutes,
+            "data": metrics,
         }
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"CloudWatch metrics fetch failed: {e}")
+        return {
+            "source": "error",
+            "instance_id": body.instance_id,
+            "error": str(e)
+        }
 
 
 @router.get("/aws/instances")

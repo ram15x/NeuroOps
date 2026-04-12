@@ -1,280 +1,345 @@
-import pandas as pd
 import numpy as np
-import json
-import os
-import subprocess
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
-from collections import Counter
 from datetime import datetime, timedelta
-from backend.core.config import settings
-from backend.services.redis_service import redis_client
-from backend.services.aws_service import get_logs_client
+from typing import List, Dict, Optional
+from sklearn.linear_model import LinearRegression
+
 from backend.core.logger import get_logger
+from backend.services.redis_service import redis_client
 
-logger = get_logger("log_clusterer")
+logger = get_logger(__name__)
 
-def fetch_system_logs():
-    """Fetch real system logs from EC2 (journalctl)"""
-    try:
-        # Get last 1000 lines of system logs
-        result = subprocess.run(
-            ["sudo", "journalctl", "--since", "1 hour ago", "-n", "1000", "--no-pager"],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.stdout:
-            logs = result.stdout.strip().split('\n')
-            logger.info(f"Fetched {len(logs)} system logs from journalctl")
-            return logs
-    except Exception as e:
-        logger.warning(f"Could not fetch journalctl logs: {e}")
+
+class CapacityPlanner:
+    """Predicts future resource needs based on historical trends"""
     
-    return None
-
-def fetch_cloudwatch_logs(log_group_name: str = None, minutes: int = 60, limit: int = 1000):
-    """Fetch logs from AWS CloudWatch"""
-    try:
-        logs_client = get_logs_client()
-        
-        # Try multiple log groups
-        log_groups_to_try = [
-            "/aws/ec2/neuroops-demo",
-            "/aws/lambda/neuroops",
-            "/var/log/messages",
-            "/var/log/syslog",
-            "/aws/cloudwatch"
-        ]
-        
-        if log_group_name:
-            log_groups_to_try = [log_group_name]
-        
-        for log_group in log_groups_to_try:
-            try:
-                streams_response = logs_client.describe_log_streams(
-                    logGroupName=log_group,
-                    orderBy='LastEventTime',
-                    descending=True,
-                    limit=5
-                )
+    def __init__(self, instance_id: str):
+        self.instance_id = instance_id
+    
+    def get_historical_data(self, metric_name: str, days: int = 7) -> List[float]:
+        """Get historical data from Redis for a metric"""
+        values = []
+        for i in range(days * 24 * 60 // 60):  # hourly data points
+            # This would fetch from stored history
+            # For now, use demo data or implement actual storage
+            pass
+        return values
+    
+    def predict_cpu_trend(self, days: int = 30) -> Dict:
+        """Predict CPU usage trend"""
+        try:
+            # Get last 7 days of CPU data from Redis
+            cpu_key = f"cpu_history:{self.instance_id}"
+            history = redis_client.lrange(cpu_key, 0, 167)  # 7 days * 24 hours
+            
+            if not history:
+                return {
+                    "error": "No historical CPU data available",
+                    "confidence": "low",
+                    "recommendation": "Collecting data - check back in 7 days"
+                }
+            
+            history = [float(x) for x in history if x]
+            
+            if len(history) < 24:
+                return {
+                    "current_avg": round(np.mean(history), 2) if history else 0,
+                    "growth_rate_per_day": 0,
+                    "days_until_80_percent": None,
+                    "recommendation": f"Collecting data ({len(history)}/168 hours) - check back in {7 - len(history)//24} days",
+                    "confidence": "low"
+                }
+            
+            # Create time indices (0,1,2,...)
+            X = np.array(range(len(history))).reshape(-1, 1)
+            y = np.array(history)
+            
+            # Train linear regression
+            model = LinearRegression()
+            model.fit(X, y)
+            
+            # Predict future values
+            future_X = np.array(range(len(history), len(history) + days)).reshape(-1, 1)
+            predictions = model.predict(future_X)
+            
+            # Calculate when CPU will hit 80%
+            days_to_80 = None
+            for i, pred in enumerate(predictions):
+                if pred >= 80:
+                    days_to_80 = i
+                    break
+            
+            # Calculate growth rate (per day, not per hour)
+            growth_rate_per_hour = model.coef_[0]
+            growth_rate_per_day = growth_rate_per_hour * 24
+            current_avg = np.mean(history[-24:]) if len(history) >= 24 else np.mean(history)
+            
+            return {
+                "metric": "cpu",
+                "current_avg": round(current_avg, 2),
+                "growth_rate_per_day": round(growth_rate_per_day, 2),
+                "predictions": [round(p, 2) for p in predictions[:7]],
+                "days_until_80_percent": days_to_80,
+                "recommendation": self._get_recommendation("cpu", days_to_80, growth_rate_per_day),
+                "confidence": "medium" if len(history) > 48 else "low"
+            }
+            
+        except Exception as e:
+            logger.error(f"CPU trend prediction failed: {e}")
+            return {
+                "error": str(e),
+                "current_avg": 0,
+                "growth_rate_per_day": 0,
+                "days_until_80_percent": None,
+                "recommendation": "Error calculating trend - using fallback values",
+                "confidence": "low"
+            }
+    
+    def predict_memory_trend(self, days: int = 30) -> Dict:
+        """Predict memory usage trend"""
+        try:
+            # Get memory history from Redis
+            memory_key = f"memory_history:{self.instance_id}"
+            history = redis_client.lrange(memory_key, 0, 167)
+            
+            if not history:
+                # Fallback to current value only
+                current = redis_client.get(f"memory:{self.instance_id}")
+                current_memory = float(current) if current else 0
                 
-                if not streams_response.get('logStreams'):
-                    continue
+                return {
+                    "metric": "memory",
+                    "current": round(current_memory, 2),
+                    "growth_rate_per_day": 0,
+                    "predictions": [current_memory] * 7,
+                    "days_until_90_percent": None,
+                    "recommendation": "Collecting memory data - check back in 7 days",
+                    "confidence": "low"
+                }
+            
+            history = [float(x) for x in history if x]
+            
+            if len(history) < 24:
+                current_memory = history[-1] if history else 0
+                return {
+                    "metric": "memory",
+                    "current": round(current_memory, 2),
+                    "growth_rate_per_day": 0,
+                    "predictions": [current_memory] * 7,
+                    "days_until_90_percent": None,
+                    "recommendation": f"Collecting data ({len(history)}/168 hours)",
+                    "confidence": "low"
+                }
+            
+            X = np.array(range(len(history))).reshape(-1, 1)
+            y = np.array(history)
+            model = LinearRegression()
+            model.fit(X, y)
+            
+            future_X = np.array(range(len(history), len(history) + days)).reshape(-1, 1)
+            predictions = model.predict(future_X)
+            
+            days_to_90 = None
+            for i, pred in enumerate(predictions):
+                if pred >= 90:
+                    days_to_90 = i
+                    break
+            
+            growth_rate_per_day = model.coef_[0] * 24
+            current_memory = np.mean(history[-24:]) if len(history) >= 24 else history[-1]
+            
+            return {
+                "metric": "memory",
+                "current": round(current_memory, 2),
+                "growth_rate_per_day": round(growth_rate_per_day, 2),
+                "predictions": [round(p, 2) for p in predictions[:7]],
+                "days_until_90_percent": days_to_90,
+                "recommendation": self._get_recommendation("memory", days_to_90, growth_rate_per_day),
+                "confidence": "medium" if len(history) > 48 else "low"
+            }
+            
+        except Exception as e:
+            logger.error(f"Memory trend prediction failed: {e}")
+            return {
+                "error": str(e),
+                "current": 0,
+                "growth_rate_per_day": 0,
+                "days_until_90_percent": None,
+                "recommendation": "Error calculating trend - using fallback values",
+                "confidence": "low"
+            }
+    
+    def predict_disk_trend(self, days: int = 30) -> Dict:
+        """Predict disk usage trend"""
+        try:
+            disk_key = f"disk_history:{self.instance_id}"
+            history = redis_client.lrange(disk_key, 0, 167)
+            
+            if not history:
+                current = redis_client.get(f"disk:{self.instance_id}")
+                current_disk = float(current) if current else 0
                 
-                start_time = int((datetime.utcnow() - timedelta(minutes=minutes)).timestamp() * 1000)
-                
-                all_logs = []
-                for stream in streams_response['logStreams'][:3]:
-                    try:
-                        events = logs_client.get_log_events(
-                            logGroupName=log_group,
-                            logStreamName=stream['logStreamName'],
-                            startTime=start_time,
-                            limit=limit
-                        )
-                        for event in events.get('events', []):
-                            message = event.get('message', '')
-                            if message and len(message) > 10:
-                                all_logs.append(message)
-                    except Exception as e:
-                        logger.debug(f"Error fetching from stream: {e}")
-                
-                if all_logs:
-                    logger.info(f"Fetched {len(all_logs)} logs from CloudWatch group: {log_group}")
-                    return all_logs
-                    
-            except Exception as e:
-                logger.debug(f"Log group {log_group} not accessible: {e}")
-                continue
+                return {
+                    "metric": "disk",
+                    "current": round(current_disk, 2),
+                    "growth_rate_per_day": 0,
+                    "predictions": [current_disk] * 7,
+                    "days_until_95_percent": None,
+                    "recommendation": "Collecting disk data - check back in 7 days",
+                    "confidence": "low"
+                }
+            
+            history = [float(x) for x in history if x]
+            
+            if len(history) < 24:
+                current_disk = history[-1] if history else 0
+                return {
+                    "metric": "disk",
+                    "current": round(current_disk, 2),
+                    "growth_rate_per_day": 0,
+                    "predictions": [current_disk] * 7,
+                    "days_until_95_percent": None,
+                    "recommendation": f"Collecting data ({len(history)}/168 hours)",
+                    "confidence": "low"
+                }
+            
+            X = np.array(range(len(history))).reshape(-1, 1)
+            y = np.array(history)
+            model = LinearRegression()
+            model.fit(X, y)
+            
+            future_X = np.array(range(len(history), len(history) + days)).reshape(-1, 1)
+            predictions = model.predict(future_X)
+            
+            days_to_95 = None
+            for i, pred in enumerate(predictions):
+                if pred >= 95:
+                    days_to_95 = i
+                    break
+            
+            growth_rate_per_day = model.coef_[0] * 24
+            current_disk = np.mean(history[-24:]) if len(history) >= 24 else history[-1]
+            
+            return {
+                "metric": "disk",
+                "current": round(current_disk, 2),
+                "growth_rate_per_day": round(growth_rate_per_day, 2),
+                "predictions": [round(p, 2) for p in predictions[:7]],
+                "days_until_95_percent": days_to_95,
+                "recommendation": self._get_recommendation("disk", days_to_95, growth_rate_per_day),
+                "confidence": "medium" if len(history) > 48 else "low"
+            }
+            
+        except Exception as e:
+            logger.error(f"Disk trend prediction failed: {e}")
+            return {
+                "error": str(e),
+                "current": 0,
+                "growth_rate_per_day": 0,
+                "days_until_95_percent": None,
+                "recommendation": "Error calculating trend - using fallback values",
+                "confidence": "low"
+            }
+    
+    def predict_instance_need(self, days: int = 30) -> Dict:
+        """Predict if new instances will be needed"""
+        cpu_pred = self.predict_cpu_trend(days)
+        memory_pred = self.predict_memory_trend(days)
         
-        return None
+        if "error" in cpu_pred and "error" in memory_pred:
+            return {
+                "instance_id": self.instance_id,
+                "error": "Insufficient data for prediction",
+                "recommendation": "Collecting data - check back in 7 days"
+            }
         
-    except Exception as e:
-        logger.error(f"Failed to fetch CloudWatch logs: {e}")
-        return None
-
-def fetch_application_logs():
-    """Fetch application logs from NeuroOps itself"""
-    try:
-        log_file = os.path.join(settings.LOGS_DIR, "uvicorn.log")
-        if os.path.exists(log_file):
-            with open(log_file, 'r') as f:
-                logs = f.readlines()[-500:]  # Last 500 lines
-                logger.info(f"Fetched {len(logs)} logs from uvicorn.log")
-                return logs
-    except Exception as e:
-        logger.warning(f"Could not fetch application logs: {e}")
-    
-    return None
-
-def _generate_sample_logs():
-    """Generate realistic sample logs (fallback when no real logs)"""
-    sample_patterns = [
-        "ERROR: Connection timeout to database after 30s",
-        "WARNING: High CPU usage detected: {cpu}%",
-        "INFO: Service {service} started successfully",
-        "ERROR: Disk space running low: {disk}% used",
-        "CRITICAL: Memory allocation failed for process {pid}",
-        "WARNING: Network latency spike detected: {latency}ms",
-        "INFO: Backup completed successfully for {service}",
-        "ERROR: Authentication failed for user {user}",
-        "WARNING: Rate limit exceeded for API key {key}",
-        "INFO: Cache hit ratio: {ratio}%",
-        "ERROR: Failed to connect to Redis: Connection refused",
-        "WARNING: Slow query detected: {query} took {time}s",
-        "INFO: Deployment {version} completed for {service}",
-        "ERROR: SSL certificate expired for domain {domain}",
-        "CRITICAL: Service {service} is down!",
-    ]
-    
-    import random
-    services = ["payment-service", "auth-service", "api-gateway", "notification-service", "database-proxy"]
-    
-    logs = []
-    for i in range(500):
-        pattern = random.choice(sample_patterns)
-        log = pattern.format(
-            cpu=random.randint(30, 95),
-            service=random.choice(services),
-            disk=random.randint(20, 95),
-            pid=random.randint(1000, 9999),
-            latency=random.randint(50, 500),
-            user=f"user{random.randint(1, 100)}",
-            key=f"key{random.randint(1, 50)}",
-            ratio=random.randint(60, 99),
-            query=f"SELECT_{random.randint(1, 10)}",
-            time=random.randint(1, 30),
-            version=f"v{random.randint(1, 5)}.{random.randint(0, 9)}",
-            domain=f"service{random.randint(1, 10)}.example.com"
-        )
-        logs.append(log)
-    
-    logger.warning(f"Generated {len(logs)} sample logs for testing")
-    return logs
-
-def _load_logs(use_real_logs: bool = True):
-    """Load logs from multiple sources: journalctl > CloudWatch > Application > Sample"""
-    
-    # Try journalctl (EC2 system logs) - most reliable
-    if use_real_logs:
-        logs = fetch_system_logs()
-        if logs:
-            return logs
-    
-    # Try CloudWatch logs
-    if use_real_logs:
-        logs = fetch_cloudwatch_logs()
-        if logs:
-            return logs
-    
-    # Try application logs
-    if use_real_logs:
-        logs = fetch_application_logs()
-        if logs:
-            return logs
-    
-    # Fallback to sample logs
-    return _generate_sample_logs()
-
-def run_log_clustering(n_clusters: int = None, auto_optimize: bool = True, use_real_logs: bool = True) -> dict:
-    """Run log clustering with real logs from multiple sources"""
-    
-    cache_key = f"log_clusters:{n_clusters if n_clusters else 'auto'}"
-    cached = redis_client.get(cache_key)
-    if cached:
-        return json.loads(cached)
-    
-    texts = _load_logs(use_real_logs=use_real_logs)
-    total_logs = len(texts)
-    
-    if total_logs < 2:
+        instances_needed = 0
+        reasons = []
+        
+        cpu_days = cpu_pred.get("days_until_80_percent")
+        if cpu_days is not None and cpu_days < days:
+            instances_needed += 1
+            reasons.append(f"CPU will reach 80% in {cpu_days} days")
+        
+        memory_days = memory_pred.get("days_until_90_percent")
+        if memory_days is not None and memory_days < days:
+            instances_needed += 1
+            reasons.append(f"Memory will reach 90% in {memory_days} days")
+        
+        if instances_needed == 0:
+            recommendation = f"No new instances needed in the next {days} days"
+        else:
+            recommendation = f"Consider adding {instances_needed} more EC2 instance(s) in the next {days} days"
+        
         return {
-            "total_logs_analyzed": total_logs,
-            "n_clusters": 0,
-            "clusters": [],
-            "source": "none",
-            "error": "Insufficient logs"
+            "instance_id": self.instance_id,
+            "days": days,
+            "instances_needed": instances_needed,
+            "reasons": reasons,
+            "recommendation": recommendation,
+            "cpu_prediction": cpu_pred,
+            "memory_prediction": memory_pred
         }
     
-    # Vectorize
-    vectorizer = TfidfVectorizer(
-        max_features=settings.LOG_CLUSTER_MAX_FEATURES,
-        stop_words="english"
-    )
-    X = vectorizer.fit_transform(texts)
-    
-    # Determine optimal clusters
-    if auto_optimize and n_clusters is None:
-        from sklearn.metrics import silhouette_score
-        best_k = 2
-        best_score = -1
-        max_k = min(settings.LOG_CLUSTER_MAX_K, total_logs - 1)
-        for k in range(2, max_k + 1):
-            km = KMeans(n_clusters=k, random_state=42, n_init=10)
-            labels = km.fit_predict(X)
-            if len(set(labels)) > 1:
-                score = silhouette_score(X, labels)
-                if score > best_score:
-                    best_score = score
-                    best_k = k
-        n_clusters = best_k
-    elif n_clusters is None:
-        n_clusters = settings.LOG_CLUSTER_DEFAULT_K
-    
-    n_clusters = min(n_clusters, total_logs)
-    
-    # Run clustering
-    km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    labels = km.fit_predict(X)
-    cluster_counts = Counter(labels)
-    
-    results = []
-    for cluster_id in range(n_clusters):
-        indices = [i for i, l in enumerate(labels) if l == cluster_id]
-        count = cluster_counts[cluster_id]
-        
-        centroid = km.cluster_centers_[cluster_id]
-        cluster_vectors = X[indices]
-        dense_vectors = cluster_vectors.toarray()
-        centroid_norm = centroid / (np.linalg.norm(centroid) + 1e-9)
-        similarities = dense_vectors.dot(centroid_norm)
-        best_idx = indices[int(np.argmax(similarities))]
-        representative = texts[best_idx]
-        
-        feature_names = vectorizer.get_feature_names_out()
-        top_keyword_indices = centroid.argsort()[-5:][::-1]
-        top_keywords = [feature_names[i] for i in top_keyword_indices if i < len(feature_names)]
-        
-        results.append({
-            "cluster_id": cluster_id,
-            "count": count,
-            "percentage": round((count / total_logs) * 100, 2),
-            "representative": representative[:200],
-            "top_keywords": top_keywords
-        })
-    
-    results.sort(key=lambda x: x["count"], reverse=True)
-    
-    output = {
-        "total_logs_analyzed": total_logs,
-        "n_clusters": n_clusters,
-        "auto_optimized": auto_optimize,
-        "source": "system_logs",
-        "clusters": results
-    }
-    
-    redis_client.setex(cache_key, settings.LOG_CLUSTER_CACHE_TTL, json.dumps(output))
-    
-    return output
+    def _get_recommendation(self, metric: str, days: Optional[int], growth_rate: float) -> str:
+        if days is None:
+            if growth_rate <= 0:
+                return f"✅ {metric.upper()} usage is stable or declining. No action needed."
+            else:
+                return f"📈 {metric.upper()} is trending up but below threshold. Monitor trend."
+        elif days < 7:
+            return f"⚠️ {metric.upper()} will reach threshold in {days} days — URGENT action required!"
+        elif days < 14:
+            return f"⚠️ {metric.upper()} will reach threshold in {days} days — Plan scaling soon."
+        elif days < 30:
+            return f"📈 {metric.upper()} will reach threshold in {days} days — Monitor closely."
+        else:
+            return f"✅ {metric.upper()} usage is healthy. No immediate action needed."
 
-def run_daily_clustering():
-    """Auto-run clustering once per day"""
-    cache_key = "log_clusters:daily"
-    last_run = redis_client.get(cache_key)
+
+def get_capacity_report(instance_id: str) -> dict:
+    """Get capacity planning report for an EC2 instance"""
+    planner = CapacityPlanner(instance_id)
     
-    if not last_run or datetime.now().date() > datetime.fromisoformat(last_run).date():
-        result = run_log_clustering(n_clusters=8, auto_optimize=True, use_real_logs=True)
-        redis_client.setex(cache_key, 86400, datetime.now().isoformat())
-        redis_client.setex("log_clusters:daily_result", 86400, json.dumps(result))
-        logger.info(f"Daily log clustering completed - Source: {result.get('source', 'unknown')}")
-        return result
-    return None
+    cpu_pred = planner.predict_cpu_trend()
+    memory_pred = planner.predict_memory_trend()
+    disk_pred = planner.predict_disk_trend()
+    
+    # Determine overall recommendation
+    if "error" in cpu_pred and "error" in memory_pred:
+        recommendation = "Collecting data - check back in 7 days"
+    else:
+        cpu_days = cpu_pred.get("days_until_80_percent")
+        memory_days = memory_pred.get("days_until_90_percent")
+        
+        if cpu_days is not None and cpu_days < 7:
+            recommendation = "⚠️ Urgent: CPU will reach threshold within 7 days"
+        elif memory_days is not None and memory_days < 7:
+            recommendation = "⚠️ Urgent: Memory will reach threshold within 7 days"
+        elif cpu_days is not None and cpu_days < 30:
+            recommendation = f"📈 Plan scaling: CPU threshold in {cpu_days} days"
+        elif memory_days is not None and memory_days < 30:
+            recommendation = f"📈 Plan scaling: Memory threshold in {memory_days} days"
+        else:
+            recommendation = "✅ System stable - no scaling needed in next 30 days"
+    
+    return {
+        "instance_id": instance_id,
+        "cpu": {
+            "current_avg": cpu_pred.get("current_avg", 0),
+            "growth_rate_per_day": cpu_pred.get("growth_rate_per_day", 0),
+            "days_until_80_percent": cpu_pred.get("days_until_80_percent")
+        },
+        "memory": {
+            "current": memory_pred.get("current", 0),
+            "growth_rate_per_day": memory_pred.get("growth_rate_per_day", 0),
+            "days_until_90_percent": memory_pred.get("days_until_90_percent")
+        },
+        "disk": {
+            "current": disk_pred.get("current", 0),
+            "growth_rate_per_day": disk_pred.get("growth_rate_per_day", 0),
+            "days_until_95_percent": disk_pred.get("days_until_95_percent")
+        },
+        "instance_need": {
+            "recommendation": recommendation
+        }
+    }
