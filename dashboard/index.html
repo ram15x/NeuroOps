@@ -2589,18 +2589,13 @@ async function loadCostSavings() {
         });
         const data = await response.json();
         const savingsEl = document.getElementById('savings-amount');
-        const recEl = document.getElementById('savings-recommendation');
         if (savingsEl) {
-            savingsEl.textContent = `$${data.savings}`;
-        }
-        if (recEl) {
-            recEl.textContent = data.recommendation || 'saved this month via ScaleWise';
+            savingsEl.textContent = `$${data.savings || '0.00'}`;
         }
     } catch(e) {
         console.log('Failed to load savings:', e);
     }
 }
-
 function toggleExpand(incidentId) {
     const fullTextDiv = document.getElementById(`full-text-${incidentId}`);
     if (fullTextDiv) {
