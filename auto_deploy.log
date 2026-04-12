@@ -3,3 +3,10 @@
 [2026-04-09T11:32:15.533065] Deploying new model: gradient_boosting
 [2026-04-09T11:32:15.535062] Deployed gradient_boosting model to active
 [2026-04-09T11:32:15.535280] ✅ Successfully deployed gradient_boosting model
+[2026-04-10T11:59:52.820027] Running auto-deploy check...
+[2026-04-10T11:59:52.821022] A/B Test Result: Winner = random_forest (RF: 88.79%, GB: 85.6%)
+[2026-04-10T11:59:52.822214] Deploying new model: random_forest
+[2026-04-10T11:59:52.851854] Deployed random_forest model to active
+[2026-04-10T18:37:57.145198] Running auto-deploy check...
+[2026-04-10T18:37:57.147666] A/B Test Result: Winner = random_forest (RF: 90.64%, GB: 85.37%)
+[2026-04-10T18:37:57.155510] Current model 'random_forest' is already the best. No deployment needed.

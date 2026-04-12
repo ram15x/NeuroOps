@@ -1,7 +1,8 @@
 from fastapi import WebSocket
 from typing import List
 import json
-
+import logging
+logger = logging.getLogger(__name__)
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []

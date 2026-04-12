@@ -46,6 +46,73 @@
             z-index: 0;
         }
 
+        /* Glassmorphism cards */
+        .panel, .stat-card, .card {
+            backdrop-filter: blur(10px);
+            background: rgba(10, 15, 26, 0.85);
+            border: 1px solid rgba(0, 212, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        /* Gradient borders on hover */
+        .panel:hover, .stat-card:hover, .card:hover {
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+
+        /* Animated gradient buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--cyan), var(--purple), var(--cyan));
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Pulsing live indicator */
+        .live-badge {
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        /* Smooth transitions */
+        * {
+            transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        /* Glowing tabs */
+        .tab.active {
+            text-shadow: 0 0 8px var(--cyan);
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .response-box.loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
         .toast-container {
             position: fixed;
             top: 20px;
@@ -246,7 +313,7 @@
         }
 
         .tab:hover { color: var(--text); background: rgba(0,212,255,0.05); }
-        .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); background: rgba(0,212,255,0.04); }
+        .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); background: rgba(0,212,255,0.04); text-shadow: 0 0 8px var(--cyan); }
         .tab .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text3); }
         .tab.active .dot { background: var(--cyan); }
 
@@ -644,7 +711,14 @@
             max-height: 250px;
         }
         .response-box.error { color: var(--red); }
-        .response-box.loading { color: var(--text3); font-style: italic; }
+        .response-box.loading { 
+            color: var(--text3); 
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
 
         .alert-item {
             display: flex;
@@ -918,7 +992,7 @@
         <div class="stats-row">
             <div class="stat-card"><div class="stat-label">anomalies / 24h</div><div class="stat-value red" id="stat-anomalies">0</div><div class="stat-meta">live detection</div></div>
             <div class="stat-card"><div class="stat-label">system health</div><div class="stat-value green" id="stat-health">healthy</div><div class="stat-meta">overall status</div></div>
-            <div class="stat-card"><div class="stat-label">ml models</div><div class="stat-value purple">6</div><div class="stat-meta">isoforest · rf · gb · rul×2</div></div>
+            <div class="stat-card"><div class="stat-label">ml models</div><div class="stat-value purple">6</div><div class="stat-meta">hybrid ml + z-score</div></div>
             <div class="stat-card"><div class="stat-label">api endpoints</div><div class="stat-value" style="color:var(--cyan)">30+</div><div class="stat-meta">all modules active</div></div>
             <div class="stat-card"><div class="stat-label">modules online</div><div class="stat-value green">8</div><div class="stat-meta">all systems go</div></div>
         </div>
@@ -965,7 +1039,7 @@
     <div class="tab-panel" id="tab-inframind">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">anomaly detection <span class="badge">isolation forest</span></div>
+                <div class="panel-title">anomaly detection <span class="badge">hybrid ml + z-score</span></div>
                 <div class="input-row">
                     <div class="input-group"><label class="input-label">metric value</label><input type="number" id="metric-value" value="99.9"></div>
                     <div class="input-group"><label class="input-label">rolling mean</label><input type="number" id="rolling-mean" value="20.0"></div>
@@ -983,7 +1057,7 @@
     <div class="tab-panel" id="tab-opsgpt">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">log analysis <span class="badge">phi-3 mini</span></div>
+                <div class="panel-title">log analysis <span class="badge">llm-powered</span></div>
                 <textarea id="log-input">ERROR: Database connection timeout after 30s. Max retries exceeded. Service unavailable.</textarea>
                 <button class="btn btn-primary" onclick="runOpsGPT()">analyze log</button>
                 <div class="response-box loading" id="ops-result">waiting for log input...</div>
@@ -1002,13 +1076,15 @@
             <div class="panel">
                 <div class="panel-title">binary failure predict <span class="badge">random forest</span></div>
                 <div class="input-row">
-                    <div class="input-group"><label class="input-label">unit id</label><input type="text" id="unit-id" value="i-00dfb80a59da9a56d"></div>
-                    <div class="input-group"><label class="input-label">CPU Usage (%)</label><input type="number" id="sensor1" value="0.0" step="0.1"></div>
-                    <div class="input-group"><label class="input-label">Status Check</label>
-                        <select id="sensor2"><option value="1">OK</option><option value="0">FAILING</option></select>
+                    <div class="input-group"><label class="input-label">EC2 Instance ID</label><input type="text" id="unit-id" placeholder="i-00dfb80a59da9a56d" value="i-00dfb80a59da9a56d"></div>
+                    <div class="input-group"><label class="input-label">CPU Utilization (%)</label><input type="number" id="sensor1" value="0.0" step="0.1" placeholder="e.g., 85.5"></div>
+                    <div class="input-group"><label class="input-label">Memory Usage (%)</label><input type="number" id="memory-usage" value="0.0" step="0.1" placeholder="e.g., 70.0"></div>
+                    <div class="input-group"><label class="input-label">Disk Usage (%)</label><input type="number" id="disk-usage" value="0.0" step="0.1" placeholder="e.g., 30.0"></div>
+                    <div class="input-group"><label class="input-label">Instance Status</label>
+                        <select id="sensor2"><option value="1">✅ OK (Running)</option><option value="0">❌ FAILING</option></select>
                     </div>
-                    <div class="input-group"><label class="input-label">Recent Reboots</label><input type="number" id="sensor3" value="0" step="1"></div>
-                    <div class="input-group"><label class="input-label">Instance Age (days)</label><input type="number" id="sensor4" value="30" step="1"></div>
+                    <div class="input-group"><label class="input-label">Recent Reboots (24h)</label><input type="number" id="sensor3" value="0" step="1" placeholder="0"></div>
+                    <div class="input-group"><label class="input-label">Instance Age (Days)</label><input type="number" id="sensor4" value="30" step="1" placeholder="30"></div>
                 </div>
                 <button class="btn btn-primary" onclick="runFailure()">predict failure</button>
                 <div class="response-box loading" id="fail-result">waiting...</div>
@@ -1095,7 +1171,7 @@
     <div class="tab-panel" id="tab-builddeploy">
         <div class="grid-2">
             <div class="panel">
-                <div class="panel-title">buildsense <span class="badge">ci simulation</span></div>
+                <div class="panel-title">buildsense <span class="badge">github actions</span></div>
                 <div class="input-group"><label class="input-label">service name</label><input type="text" id="build-service" value="payment-service"></div>
                 <div class="input-group"><label class="input-label">branch</label><input type="text" id="build-branch" value="main"></div>
                 <button class="btn btn-primary" onclick="runBuild()">trigger build</button>
@@ -1127,7 +1203,7 @@
     <div id="tab-aws" class="tab-panel">
         <div class="section-grid">
             <div class="card"><h3>AWS Connection Status</h3><button onclick="checkAWSStatus()">Check Status</button><div id="aws-status-result" class="result-box"></div></div>
-            <div class="card"><h3>Fetch CloudWatch Metrics</h3><label>Instance ID</label><input id="aws-instance-id" type="text" placeholder="i-0abc123def456789" /><label>Minutes (5-1440)</label><input id="aws-minutes" type="number" value="60" min="5" max="1440" /><button onclick="fetchAWSMetrics()">Fetch Metrics</button><div id="aws-metrics-result" class="result-box"></div></div>
+            <div class="card"><h3>Fetch CloudWatch Metrics</h3><label>Instance ID</label><input id="aws-instance-id" type="text" placeholder="i-00dfb80a59da9a56d" /><label>Minutes (5-1440)</label><input id="aws-minutes" type="number" value="60" min="5" max="1440" /><button onclick="fetchAWSMetrics()">Fetch Metrics</button><div id="aws-metrics-result" class="result-box"></div></div>
             <div class="card"><h3>EC2 Instances</h3><button onclick="listEC2Instances()">List Instances</button><div id="aws-instances-result" class="result-box"></div></div>
             <div class="card"><h3>Upload Model to S3</h3><label>Local Path</label><input id="aws-local-path" type="text" placeholder="ml_models/saved/inframind_model.pkl" /><label>S3 Key</label><input id="aws-s3-key" type="text" placeholder="models/inframind_model.pkl" /><button onclick="uploadModel()">Upload</button><div id="aws-upload-result" class="result-box"></div></div>
             <div class="card"><h3>S3 Model Store</h3><button onclick="listS3Models()">List Models</button><div id="aws-s3-result" class="result-box"></div></div>
@@ -1165,6 +1241,49 @@ const WS = (window.location.protocol === "https:" ? "wss://" : "ws://") + window
 
 let authToken = localStorage.getItem('neuroops_token');
 let currentInstanceId = null;
+let anomalyChart = null;
+let infChart = null;
+
+function makeLineChartWithTheme(id, label, color, gridColor, textColor) {
+    const ctx = document.getElementById(id).getContext("2d");
+    return new Chart(ctx, { 
+        type: "line", 
+        data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color + "18", tension: 0.4, fill: true, pointBackgroundColor: [] }] }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { labels: { color: textColor, font: { size: 11 } } } }, 
+            scales: { 
+                x: { ticks: { color: textColor }, grid: { color: gridColor } }, 
+                y: { ticks: { color: textColor }, grid: { color: gridColor } } 
+            } 
+        } 
+    });
+}
+
+function makeLineChart(id, label, color) {
+    const isDark = localStorage.getItem('neuroops_theme') !== 'light';
+    const gridColor = isDark ? '#1a2a3a' : '#d0d8e8';
+    const textColor = isDark ? '#3a5a7a' : '#8a9ab0';
+    return makeLineChartWithTheme(id, label, color, gridColor, textColor);
+}
+
+function updateChartTheme() {
+    const isDark = localStorage.getItem('neuroops_theme') !== 'light';
+    const gridColor = isDark ? '#1a2a3a' : '#d0d8e8';
+    const textColor = isDark ? '#3a5a7a' : '#8a9ab0';
+    
+    if (anomalyChart) {
+        anomalyChart.destroy();
+        anomalyChart = makeLineChartWithTheme("anomalyChart", "anomaly score", "#00d4ff", gridColor, textColor);
+        loadHistoricalScores();
+    }
+    if (infChart) {
+        infChart.destroy();
+        infChart = makeLineChartWithTheme("infChart", "score", "#7c3aed", gridColor, textColor);
+        loadHistoricalScores();
+    }
+}
 
 // ========== AUTO-REFRESH + MANUAL OVERRIDE SYSTEM ==========
 let autoRefreshTimer = null;
@@ -1173,6 +1292,41 @@ let manualModeTimeout = null;
 const AUTO_REFRESH_INTERVAL = 15000;
 const MANUAL_MODE_DURATION = 20000;
 let manuallyModifiedInputs = new Set();
+
+function getSensorPayload(unitId) {
+    const cpuInput = document.getElementById("sensor1");
+    const memoryInput = document.getElementById("memory-usage");
+    const diskInput = document.getElementById("disk-usage");
+    const statusSelect = document.getElementById("sensor2");
+    const rebootInput = document.getElementById("sensor3");
+    const ageInput = document.getElementById("sensor4");
+    
+    return {
+        unit_id: unitId || document.getElementById("unit-id").value,
+        cpu_usage: cpuInput ? (parseFloat(cpuInput.value) || 0) : 0,
+        memory_usage: memoryInput ? (parseFloat(memoryInput.value) || 0) : 70,
+        disk_usage: diskInput ? (parseFloat(diskInput.value) || 0) : 30,
+        status_check_ok: statusSelect ? (statusSelect.value === "1") : true,
+        recent_reboots: rebootInput ? (parseInt(rebootInput.value) || 0) : 0,
+        instance_age_days: ageInput ? (parseInt(ageInput.value) || 30) : 30
+    };
+}
+
+function setLoadingWithSpinner(id, msg = "processing...") {
+    const box = document.getElementById(id);
+    if (box) {
+        box.className = "response-box loading";
+        box.innerHTML = `<span class="loading-spinner"></span> ${msg}`;
+    }
+}
+
+function setBox(id, content, type = "") {
+    const box = document.getElementById(id);
+    if (box) {
+        box.className = `response-box ${type}`;
+        box.textContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+    }
+}
 
 function markUserModified(element) {
     const inputId = element.id || element.name;
@@ -1269,12 +1423,37 @@ async function fetchLatestMetricsAndUpdate() {
                 sensor1Input.classList.remove('input-user');
             }
             
+            const memoryInput = document.getElementById('memory-usage');
+            if (memoryInput && data.memory !== undefined && !manuallyModifiedInputs.has('memory-usage')) {
+                memoryInput.value = data.memory.toFixed(1);
+                memoryInput.classList.add('input-auto');
+                memoryInput.classList.remove('input-user');
+            }
+            
+            const diskInput = document.getElementById('disk-usage');
+            if (diskInput && data.disk !== undefined && !manuallyModifiedInputs.has('disk-usage')) {
+                diskInput.value = data.disk.toFixed(1);
+                diskInput.classList.add('input-auto');
+                diskInput.classList.remove('input-user');
+            }
+            
             const ec2Display = document.getElementById('ec2-cpu-display');
             if (ec2Display) {
                 ec2Display.textContent = `${data.cpu.toFixed(1)}%`;
             }
             
-            pushChart(anomalyChart, data.cpu, data.cpu > 80);
+            if (anomalyChart) {
+                anomalyChart.data.labels.push(new Date().toLocaleTimeString());
+                anomalyChart.data.datasets[0].data.push(data.cpu);
+                anomalyChart.data.datasets[0].pointBackgroundColor.push(data.cpu > 80 ? "#ff4455" : "#00ff88");
+                if (anomalyChart.data.labels.length > 20) {
+                    anomalyChart.data.labels.shift();
+                    anomalyChart.data.datasets[0].data.shift();
+                    anomalyChart.data.datasets[0].pointBackgroundColor.shift();
+                }
+                anomalyChart.update();
+            }
+            
             console.log(`Auto-refresh: CPU=${data.cpu}%, Memory=${data.memory}%, Disk=${data.disk}%`);
         }
     } catch(e) {
@@ -1408,6 +1587,7 @@ async function loadHealingTimeline() {
 function toggleTheme() {
     const root = document.documentElement;
     const isDark = getComputedStyle(root).getPropertyValue('--bg').trim() === '#060910';
+    
     if (isDark) {
         root.style.setProperty('--bg', '#f5f7fb');
         root.style.setProperty('--bg2', '#ffffff');
@@ -1431,6 +1611,8 @@ function toggleTheme() {
         document.getElementById('themeToggle').textContent = '🌙';
         localStorage.setItem('neuroops_theme', 'dark');
     }
+    
+    updateChartTheme();
 }
 function loadTheme() { const saved = localStorage.getItem('neuroops_theme'); if (saved === 'light') toggleTheme(); }
 
@@ -1468,28 +1650,43 @@ async function checkAuth() {
 }
 
 async function checkAWSStatus() { try { const res = await fetch(`${API}/aws/status`); const data = await res.json(); document.getElementById("aws-status-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-status-result").textContent = `Error: ${e.message}`; } }
-async function fetchAWSMetrics() { const token = localStorage.getItem("neuroops_token"); const instance_id = document.getElementById("aws-instance-id").value; const minutes = parseInt(document.getElementById("aws-minutes").value); try { const res = await fetch(`${API}/aws/fetch-metrics`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ instance_id, minutes }) }); const data = await res.json(); document.getElementById("aws-metrics-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-metrics-result").textContent = `Error: ${e.message}`; } }
+async function fetchAWSMetrics() { const token = localStorage.getItem("neuroops_token"); const instance_id = document.getElementById("aws-instance-id").value || document.getElementById("aws-instance-id").placeholder; const minutes = parseInt(document.getElementById("aws-minutes").value); try { const res = await fetch(`${API}/aws/fetch-metrics`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ instance_id, minutes }) }); const data = await res.json(); document.getElementById("aws-metrics-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-metrics-result").textContent = `Error: ${e.message}`; } }
 async function listEC2Instances() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/instances`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-instances-result").textContent = JSON.stringify(data, null, 2); if (data.instances && data.instances.length > 0) { currentInstanceId = data.instances[0].instance_id; } } catch(e) { document.getElementById("aws-instances-result").textContent = `Error: ${e.message}`; } }
-async function uploadModel() { const token = localStorage.getItem("neuroops_token"); const local_path = document.getElementById("aws-local-path").value; const s3_key = document.getElementById("aws-s3-key").value; try { const res = await fetch(`${API}/aws/upload-model`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ local_path, s3_key }) }); const data = await res.json(); document.getElementById("aws-upload-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-upload-result").textContent = `Error: ${e.message}`; } }
+async function uploadModel() { const token = localStorage.getItem("neuroops_token"); const local_path = document.getElementById("aws-local-path").value || document.getElementById("aws-local-path").placeholder; const s3_key = document.getElementById("aws-s3-key").value || document.getElementById("aws-s3-key").placeholder; try { const res = await fetch(`${API}/aws/upload-model`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ local_path, s3_key }) }); const data = await res.json(); document.getElementById("aws-upload-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-upload-result").textContent = `Error: ${e.message}`; } }
 async function listS3Models() { const token = localStorage.getItem("neuroops_token"); try { const res = await fetch(`${API}/aws/list-models`, { headers: { "Authorization": `Bearer ${token}` } }); const data = await res.json(); document.getElementById("aws-s3-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-s3-result").textContent = `Error: ${e.message}`; } }
-async function sendSNSAlert() { const token = localStorage.getItem("neuroops_token"); const subject = document.getElementById("aws-sns-subject").value; const message = document.getElementById("aws-sns-message").value; try { const res = await fetch(`${API}/aws/notify`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ subject, message }) }); const data = await res.json(); document.getElementById("aws-sns-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-sns-result").textContent = `Error: ${e.message}`; } }
+async function sendSNSAlert() { const token = localStorage.getItem("neuroops_token"); const subject = document.getElementById("aws-sns-subject").value || "CRITICAL: Anomaly detected"; const message = document.getElementById("aws-sns-message").value || "Service showing CPU spike..."; try { const res = await fetch(`${API}/aws/notify`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ subject, message }) }); const data = await res.json(); document.getElementById("aws-sns-result").textContent = JSON.stringify(data, null, 2); } catch(e) { document.getElementById("aws-sns-result").textContent = `Error: ${e.message}`; } }
 
-async function runInfraMind() { setLoading("inf-result"); try { const data = await post(`${API}/inframind/predict`, { metric: "ec2_cpu", value: parseFloat(document.getElementById("metric-value").value), rolling_mean: parseFloat(document.getElementById("rolling-mean").value), rolling_std: parseFloat(document.getElementById("rolling-std").value), value_diff: parseFloat(document.getElementById("value-diff").value) }); setBox("inf-result", data, data.is_anomaly ? "error" : ""); pushChart(infChart, data.anomaly_score, data.is_anomaly); addAlert({ severity: data.severity, message: `inframind — score ${data.anomaly_score}` }); showToast(`Anomaly score: ${data.anomaly_score}`, data.severity, `📊 ${data.severity.toUpperCase()}`); } catch(e) { setBox("inf-result", e.message, "error"); } }
-async function runDrift() { setLoading("drift-result"); try { const data = await get(`${API}/inframind/drift`); setBox("drift-result", data, data.drift_detected ? "error" : ""); } catch(e) { setBox("drift-result", e.message, "error"); } }
-async function runOpsGPT() { setLoading("ops-result", "analyzing log..."); try { const result = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); if (result.error) { setBox("ops-result", result.error, "error"); } else { setBox("ops-result", result, result.severity === "critical" ? "error" : ""); } } catch(e) { setBox("ops-result", e.message, "error"); } }
+async function runInfraMind() { setLoadingWithSpinner("inf-result"); try { const data = await post(`${API}/inframind/predict`, { metric: "ec2_cpu", value: parseFloat(document.getElementById("metric-value").value), rolling_mean: parseFloat(document.getElementById("rolling-mean").value), rolling_std: parseFloat(document.getElementById("rolling-std").value), value_diff: parseFloat(document.getElementById("value-diff").value) }); setBox("inf-result", data, data.is_anomaly ? "error" : ""); if (infChart) {
+    infChart.data.labels.push(new Date().toLocaleTimeString());
+    infChart.data.datasets[0].data.push(data.anomaly_score);
+    infChart.data.datasets[0].pointBackgroundColor.push(data.is_anomaly ? "#ff4455" : "#00ff88");
+    if (infChart.data.labels.length > 20) {
+        infChart.data.labels.shift();
+        infChart.data.datasets[0].data.shift();
+        infChart.data.datasets[0].pointBackgroundColor.shift();
+    }
+    infChart.update();
+}
+addAlert({ severity: data.severity, message: `inframind — score ${data.anomaly_score}` }); showToast(`Anomaly score: ${data.anomaly_score}`, data.severity, `📊 ${data.severity.toUpperCase()}`); } catch(e) { setBox("inf-result", e.message, "error"); } }
+async function runDrift() { setLoadingWithSpinner("drift-result"); try { const data = await get(`${API}/inframind/drift`); setBox("drift-result", data, data.drift_detected ? "error" : ""); } catch(e) { setBox("drift-result", e.message, "error"); } }
+async function runOpsGPT() { setLoadingWithSpinner("ops-result", "analyzing log..."); try { const result = await post(`${API}/opsgpt/analyze`, { log: document.getElementById("log-input").value }); if (result.error) { setBox("ops-result", result.error, "error"); } else { setBox("ops-result", result, result.severity === "critical" ? "error" : ""); } } catch(e) { setBox("ops-result", e.message, "error"); } }
+async function runClusters() { setLoadingWithSpinner("cluster-result"); try { const n = parseInt(document.getElementById("n-clusters").value); const data = await post(`${API}/opsgpt/clusters`, { n_clusters: n }); const summary = data.clusters.map(c => `cluster ${c.cluster_id} (${c.count} logs, ${c.percentage}%)\n  → ${c.representative}\n  keywords: ${c.top_keywords.join(", ")}`).join("\n\n"); setBox("cluster-result", `total logs: ${data.total_logs_analyzed} | clusters: ${data.n_clusters}\n\n${summary}`); } catch(e) { setBox("cluster-result", e.message, "error"); } }
 
 async function runFailure() { 
-    setLoading("fail-result"); 
+    setLoadingWithSpinner("fail-result"); 
     try { 
         const payload = getSensorPayload(document.getElementById("unit-id").value);
         const data = await post(`${API}/failure/predict`, {
-            cpu_usage: payload.cpu,
-            status_check_ok: payload.status_check === 1,
-            recent_reboots: payload.recent_reboots,
-            instance_age_days: payload.instance_age
+            instance_id: payload.unit_id,
+            cpu_usage: payload.cpu_usage,
+            memory_usage: payload.memory_usage,
+            disk_usage: payload.disk_usage,
+            instance_age_days: payload.instance_age_days,
+            status_check_ok: payload.status_check_ok,
+            recent_reboots: payload.recent_reboots
         });
         setBox("fail-result", data, data.will_fail_soon ? "error" : ""); 
-        showToast(`Failure probability: ${data.failure_probability}`, data.risk_level.toLowerCase(), `⚠️ FAILURE PREDICTION`); 
+        showToast(`Failure probability: ${data.failure_probability}%`, data.risk_level.toLowerCase(), `⚠️ FAILURE PREDICTION`); 
         updateAutoFailureStats(data);
     } catch(e) { 
         setBox("fail-result", e.message, "error"); 
@@ -1497,14 +1694,15 @@ async function runFailure() {
 }
 
 async function runCountdown() { 
-    setLoading("countdown-result"); 
+    setLoadingWithSpinner("countdown-result"); 
     try { 
         const payload = getSensorPayload(document.getElementById("unit-id").value);
         const data = await post(`${API}/failure/countdown`, {
-            cpu_usage: payload.cpu,
-            status_check_ok: payload.status_check === 1,
-            recent_reboots: payload.recent_reboots,
-            instance_age_days: payload.instance_age
+            instance_id: payload.unit_id,
+            cpu_usage: payload.cpu_usage,
+            memory_usage: payload.memory_usage,
+            disk_usage: payload.disk_usage,
+            instance_age_days: payload.instance_age_days
         });
         setBox("countdown-result", data, data.urgency === "critical" ? "error" : ""); 
         updateAutoRULStats(data);
@@ -1587,18 +1785,36 @@ function updateAutoRULStats(data) {
     `;
 }
 
-async function runABTest() { setLoading("ab-result"); try { const payload = getSensorPayload("engine_007"); const data = await post(`${API}/failure/ab-test`, { cpu_usage: payload.cpu, status_check_ok: payload.status_check === 1, recent_reboots: payload.recent_reboots, instance_age_days: payload.instance_age }); setBox("ab-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("ab-result", e.message, "error"); } }
-async function runCorrelate() { setLoading("correlate-result"); try { const servicesList = [{ service_name: "engine_api", sensors: [] }, { service_name: "payment_service", sensors: [] }, { service_name: "auth_service", sensors: [] }, { service_name: "cache_layer", sensors: [] }]; const data = await post(`${API}/failure/correlate`, { services: servicesList }); setBox("correlate-result", data, data.is_correlated_failure ? "error" : ""); } catch(e) { setBox("correlate-result", e.message, "error"); } }
-async function runScaleWise() { setLoading("sw-result"); try { const data = await post(`${API}/scalewise/analyze`, { instance_type: document.getElementById("instance-type").value, cpu_usage: parseFloat(document.getElementById("cpu-usage").value), ram_usage: parseFloat(document.getElementById("ram-usage").value), hours_running: 730 }); setBox("sw-result", data); } catch(e) { setBox("sw-result", e.message, "error"); } }
-async function runPricing() { setLoading("pricing-result"); try { const data = await get(`${API}/scalewise/pricing`); setBox("pricing-result", data); } catch(e) { setBox("pricing-result", e.message, "error"); } }
-async function runAutoHealing() { setLoading("ah-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("heal-service").value, severity: document.getElementById("heal-severity").value, metric_value: parseFloat(document.getElementById("heal-metric").value), reason: "triggered from dashboard" }); setBox("ah-result", data); showToast(`${data.action} triggered for ${data.service}`, data.severity, `🛠️ AUTO-HEALING`); } catch(e) { setBox("ah-result", e.message, "error"); } }
-async function loadHealingRules() { setLoading("rules-result"); try { const data = await get(`${API}/autohealing/rules`); setBox("rules-result", data); } catch(e) { setBox("rules-result", e.message, "error"); } }
-async function runPipeline() { setLoading("pipeline-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("pipe-service").value, metric_value: parseFloat(document.getElementById("pipe-metric").value), severity: document.getElementById("pipe-severity").value, log: "dashboard triggered pipeline" }); setBox("pipeline-result", data); } catch(e) { setBox("pipeline-result", e.message, "error"); } }
-async function runBuild() { setLoading("build-result"); try { const data = await post(`${API}/buildsense/trigger`, { service: document.getElementById("build-service").value, branch: document.getElementById("build-branch").value }); setBox("build-result", data, data.status === "failed" ? "error" : ""); } catch(e) { setBox("build-result", e.message, "error"); } }
-async function runDeployGuard() { setLoading("dg-result"); try { const data = await post(`${API}/deployguard/predict`, { service: document.getElementById("deploy-service").value, version: document.getElementById("deploy-version").value, cpu_usage: parseFloat(document.getElementById("deploy-cpu").value), memory_usage: parseFloat(document.getElementById("deploy-mem").value), error_rate: parseFloat(document.getElementById("deploy-errors").value), recent_failures: parseInt(document.getElementById("deploy-failures").value), deployment_size_mb: parseFloat(document.getElementById("deploy-size").value) }); setBox("dg-result", data, data.decision === "blocked" ? "error" : ""); } catch(e) { setBox("dg-result", e.message, "error"); } }
-async function loadFeatures() { setLoading("features-result"); try { const data = await get(`${API}/features/list`); setBox("features-result", data); } catch(e) { setBox("features-result", e.message, "error"); } }
-async function loadRegistry() { setLoading("registry-result"); try { const data = await get(`${API}/registry/list`); setBox("registry-result", data); } catch(e) { setBox("registry-result", e.message, "error"); } }
-async function runDataPipeline() { setLoading("datapipeline-result"); try { const init = await post(`${API}/pipeline/run`, {}); setBox("datapipeline-result", `job: ${init.job_id}\npolling...`, "loading"); const timer = setInterval(async () => { const result = await get(`${API}/pipeline/result/${init.job_id}`); if (result.status === "completed") { clearInterval(timer); setBox("datapipeline-result", result.result); } }, 2000); } catch(e) { setBox("datapipeline-result", e.message, "error"); } }
+async function runABTest() { setLoadingWithSpinner("ab-result"); try { const payload = getSensorPayload("engine_007"); const data = await post(`${API}/failure/ab-test`, { cpu_usage: payload.cpu, status_check_ok: payload.status_check === 1, recent_reboots: payload.recent_reboots, instance_age_days: payload.instance_age }); setBox("ab-result", data, data.urgency === "critical" ? "error" : ""); } catch(e) { setBox("ab-result", e.message, "error"); } }
+async function runCorrelate() { setLoadingWithSpinner("correlate-result"); try { const servicesList = [
+    { service_name: "payment-service", sensors: [85, 70, 30, 30] },
+    { service_name: "auth-service", sensors: [65, 55, 25, 20] },
+    { service_name: "api-gateway", sensors: [45, 40, 20, 15] },
+    { service_name: "database-proxy", sensors: [30, 35, 15, 10] }
+]; const data = await post(`${API}/failure/correlate`, { services: servicesList }); setBox("correlate-result", data, data.is_correlated_failure ? "error" : ""); } catch(e) { setBox("correlate-result", e.message, "error"); } }
+async function runScaleWise() { 
+    setLoadingWithSpinner("sw-result"); 
+    try { 
+        const data = await post(`${API}/scalewise/analyze`, { 
+            instance_type: document.getElementById("instance-type").value, 
+            cpu_usage: parseFloat(document.getElementById("cpu-usage").value) || 12, 
+            ram_usage: parseFloat(document.getElementById("ram-usage").value) || 18, 
+            hours_running: 730 
+        }); 
+        setBox("sw-result", data); 
+    } catch(e) { 
+        setBox("sw-result", e.message, "error"); 
+    } 
+}
+async function runPricing() { setLoadingWithSpinner("pricing-result"); try { const data = await get(`${API}/scalewise/pricing`); setBox("pricing-result", data); } catch(e) { setBox("pricing-result", e.message, "error"); } }
+async function runAutoHealing() { setLoadingWithSpinner("ah-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("heal-service").value, severity: document.getElementById("heal-severity").value, metric_value: parseFloat(document.getElementById("heal-metric").value), reason: "triggered from dashboard" }); setBox("ah-result", data); showToast(`${data.action} triggered for ${data.service}`, data.severity, `🛠️ AUTO-HEALING`); } catch(e) { setBox("ah-result", e.message, "error"); } }
+async function loadHealingRules() { setLoadingWithSpinner("rules-result"); try { const data = await get(`${API}/autohealing/rules`); setBox("rules-result", data); } catch(e) { setBox("rules-result", e.message, "error"); } }
+async function runPipeline() { setLoadingWithSpinner("pipeline-result"); try { const data = await post(`${API}/autohealing/trigger`, { service: document.getElementById("pipe-service").value, metric_value: parseFloat(document.getElementById("pipe-metric").value), severity: document.getElementById("pipe-severity").value, log: "dashboard triggered pipeline" }); setBox("pipeline-result", data); } catch(e) { setBox("pipeline-result", e.message, "error"); } }
+async function runBuild() { setLoadingWithSpinner("build-result"); try { const data = await post(`${API}/buildsense/trigger`, { service: document.getElementById("build-service").value, branch: document.getElementById("build-branch").value }); setBox("build-result", data, data.status === "failed" ? "error" : ""); } catch(e) { setBox("build-result", e.message, "error"); } }
+async function runDeployGuard() { setLoadingWithSpinner("dg-result"); try { const data = await post(`${API}/deployguard/predict`, { service: document.getElementById("deploy-service").value, version: document.getElementById("deploy-version").value, cpu_usage: parseFloat(document.getElementById("deploy-cpu").value), memory_usage: parseFloat(document.getElementById("deploy-mem").value), error_rate: parseFloat(document.getElementById("deploy-errors").value), recent_failures: parseInt(document.getElementById("deploy-failures").value), deployment_size_mb: parseFloat(document.getElementById("deploy-size").value) }); setBox("dg-result", data, data.decision === "blocked" ? "error" : ""); } catch(e) { setBox("dg-result", e.message, "error"); } }
+async function loadFeatures() { setLoadingWithSpinner("features-result"); try { const data = await get(`${API}/features/list`); setBox("features-result", data); } catch(e) { setBox("features-result", e.message, "error"); } }
+async function loadRegistry() { setLoadingWithSpinner("registry-result"); try { const data = await get(`${API}/registry/list`); setBox("registry-result", data); } catch(e) { setBox("registry-result", e.message, "error"); } }
+async function runDataPipeline() { setLoadingWithSpinner("datapipeline-result"); try { const init = await post(`${API}/pipeline/run`, {}); setBox("datapipeline-result", `job: ${init.job_id}\npolling...`, "loading"); const timer = setInterval(async () => { const result = await get(`${API}/pipeline/result/${init.job_id}`); if (result.status === "completed") { clearInterval(timer); setBox("datapipeline-result", result.result); } }, 2000); } catch(e) { setBox("datapipeline-result", e.message, "error"); } }
 
 function switchTab(name) {
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
@@ -1608,28 +1824,74 @@ function switchTab(name) {
 }
 setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleTimeString(); }, 1000);
 
-function makeLineChart(id, label, color) {
-    const ctx = document.getElementById(id).getContext("2d");
-    return new Chart(ctx, { type: "line", data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color + "18", tension: 0.4, fill: true, pointBackgroundColor: [] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: "#6a8aaa", font: { size: 11 } } } }, scales: { x: { ticks: { color: "#3a5a7a" }, grid: { color: "#0d1520" } }, y: { ticks: { color: "#3a5a7a" }, grid: { color: "#1a2a3a" } } } } });
-}
-const anomalyChart = makeLineChart("anomalyChart", "anomaly score", "#00d4ff");
-const infChart = makeLineChart("infChart", "score", "#7c3aed");
-
-function pushChart(chart, value, isAnomaly) { 
-    chart.data.labels.push(new Date().toLocaleTimeString()); 
-    chart.data.datasets[0].data.push(value); 
-    chart.data.datasets[0].pointBackgroundColor.push(isAnomaly ? "#ff4455" : "#00ff88"); 
-    if (chart.data.labels.length > 20) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); chart.data.datasets[0].pointBackgroundColor.shift(); } 
-    chart.update(); 
-}
-
 async function loadHistoricalScores() {
-    try { const response = await get(`${API}/inframind/history`); if (response.scores && response.scores.length > 0) { infChart.data.labels = []; infChart.data.datasets[0].data = []; infChart.data.datasets[0].pointBackgroundColor = []; response.scores.forEach(score => pushChart(infChart, score.value, score.is_anomaly)); } else { for (let i = 0; i < 15; i++) { const val = 0.1 + Math.random() * 0.7; const isAnomaly = Math.random() < 0.15; pushChart(infChart, val, isAnomaly); } } } catch(e) { for (let i = 0; i < 15; i++) { const val = 0.1 + Math.random() * 0.7; const isAnomaly = Math.random() < 0.15; pushChart(infChart, val, isAnomaly); } } }
+    try { const response = await get(`${API}/inframind/history`); if (response.scores && response.scores.length > 0 && infChart) { 
+        infChart.data.labels = []; 
+        infChart.data.datasets[0].data = []; 
+        infChart.data.datasets[0].pointBackgroundColor = []; 
+        response.scores.forEach(score => {
+            infChart.data.labels.push(new Date(score.timestamp).toLocaleTimeString());
+            infChart.data.datasets[0].data.push(score.value);
+            infChart.data.datasets[0].pointBackgroundColor.push(score.is_anomaly ? "#ff4455" : "#00ff88");
+        });
+        infChart.update();
+    } } catch(e) { console.log('Historical scores load failed'); } }
 
-function setBox(id, content, type = "") { const box = document.getElementById(id); box.className = `response-box ${type}`; box.textContent = typeof content === "string" ? content : JSON.stringify(content, null, 2); }
-function setLoading(id, msg = "processing...") { setBox(id, msg, "loading"); }
+function addAlert(data) { 
+    const feed = document.getElementById("alert-feed"); 
+    if (feed.querySelector(".loading")) feed.innerHTML = ""; 
+    const sev = data.severity || "normal";
+    const priority = data.priority_score || 0;
+    
+    let priorityBadge = '';
+    if (priority >= 80) priorityBadge = '<span class="tag" style="background:rgba(255,68,85,0.3); color:#ff4455; margin-right:8px;">🔥 PRIORITY 1</span>';
+    else if (priority >= 50) priorityBadge = '<span class="tag" style="background:rgba(255,170,0,0.3); color:#ffaa00; margin-right:8px;">⚠️ PRIORITY 2</span>';
+    else if (priority >= 30) priorityBadge = '<span class="tag" style="background:rgba(0,212,255,0.3); color:#00d4ff; margin-right:8px;">📌 PRIORITY 3</span>';
+    
+    const item = document.createElement("div"); 
+    item.className = `alert-item ${sev}`; 
+    item.innerHTML = `
+        <div class="alert-dot ${sev}"></div>
+        <div style="flex:1;font-size:13px">
+            ${priorityBadge}
+            ${data.message || "metric analyzed"}
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${new Date().toLocaleTimeString()}</span>
+        <span class="tag ${sev}" style="margin-left:8px">${sev.toUpperCase()}</span>
+    `; 
+    feed.insertBefore(item, feed.firstChild); 
+    if (feed.children.length > 20) feed.removeChild(feed.lastChild); 
+}
 
-let ws = null;
+function loadAlerts() {
+    loadPrioritizedAlerts();
+}
+
+async function loadPrioritizedAlerts() {
+    try {
+        const token = localStorage.getItem('neuroops_token');
+        if (!token) return;
+        
+        const response = await fetch(`${API}/inframind/alerts/priority`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        if (data.alerts && data.alerts.length) {
+            const feed = document.getElementById("alert-feed");
+            feed.innerHTML = "";
+            for (const alert of data.alerts) {
+                addAlert({
+                    severity: alert.severity,
+                    message: alert.message,
+                    priority_score: alert.priority_score
+                });
+            }
+        }
+    } catch(e) {
+        console.log('Failed to load prioritized alerts:', e);
+    }
+}
 
 function updateHealthStat(severity) { 
     const el = document.getElementById("stat-health"); 
@@ -1703,8 +1965,17 @@ function connectWS() {
                 const anomaliesEl = document.getElementById("stat-anomalies");
                 if (anomaliesEl) anomaliesEl.textContent = s.anomalies;
                 updateHealthStat(s.critical > 0 ? "critical" : s.anomalies > 0 ? "warning" : "normal");
-                if (data.services && data.services.length > 0) {
-                    pushChart(anomalyChart, data.services[0].anomaly_score || 0.1, data.services[0].is_anomaly || false);
+                if (data.services && data.services.length > 0 && anomalyChart) {
+                    anomalyChart.data.labels.push(new Date().toLocaleTimeString());
+                    anomalyChart.data.datasets[0].data.push(data.services[0].anomaly_score || 0.1);
+                    anomalyChart.data.datasets[0].pointBackgroundColor.push(data.services[0].is_anomaly ? "#ff4455" : "#00ff88");
+                    if (anomalyChart.data.labels.length > 20) {
+                        anomalyChart.data.labels.shift();
+                        anomalyChart.data.datasets[0].data.shift();
+                        anomalyChart.data.datasets[0].pointBackgroundColor.shift();
+                    }
+                    anomalyChart.update();
+                    
                     const formattedServices = data.services.map(svc => ({
                         service: svc.service,
                         severity: svc.severity || "normal",
@@ -1755,8 +2026,17 @@ async function loadRealMetrics() {
             if (!currentInstanceId) currentInstanceId = instance.instance_id;
             const metricsRes = await fetch(`${API}/aws/latest-metrics/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const metrics = await metricsRes.json();
-            if (metrics.cpu_percent) {
-                pushChart(anomalyChart, metrics.cpu_percent, metrics.cpu_percent > 80);
+            if (metrics.cpu_percent && anomalyChart) {
+                anomalyChart.data.labels.push(new Date().toLocaleTimeString());
+                anomalyChart.data.datasets[0].data.push(metrics.cpu_percent);
+                anomalyChart.data.datasets[0].pointBackgroundColor.push(metrics.cpu_percent > 80 ? "#ff4455" : "#00ff88");
+                if (anomalyChart.data.labels.length > 20) {
+                    anomalyChart.data.labels.shift();
+                    anomalyChart.data.datasets[0].data.shift();
+                    anomalyChart.data.datasets[0].pointBackgroundColor.shift();
+                }
+                anomalyChart.update();
+                
                 let ec2Element = document.getElementById('ec2-cpu-display');
                 if (!ec2Element) {
                     const serviceGrid = document.getElementById('service-grid');
@@ -1889,6 +2169,18 @@ async function autoPopulateFailure() {
                 cpuInput.value = parseFloat(metrics.cpu_percent).toFixed(1);
                 cpuInput.classList.add('input-auto');
                 cpuInput.classList.remove('input-user');
+            }
+            const memoryInput = document.getElementById('memory-usage');
+            if (memoryInput && metrics.memory_percent !== undefined && !manuallyModifiedInputs.has('memory-usage')) {
+                memoryInput.value = parseFloat(metrics.memory_percent).toFixed(1);
+                memoryInput.classList.add('input-auto');
+                memoryInput.classList.remove('input-user');
+            }
+            const diskInput = document.getElementById('disk-usage');
+            if (diskInput && metrics.disk_percent !== undefined && !manuallyModifiedInputs.has('disk-usage')) {
+                diskInput.value = parseFloat(metrics.disk_percent).toFixed(1);
+                diskInput.classList.add('input-auto');
+                diskInput.classList.remove('input-user');
             }
             const statusSelect = document.getElementById('sensor2');
             if (statusSelect && statusData.is_healthy !== undefined && !manuallyModifiedInputs.has('sensor2')) {
@@ -2211,7 +2503,7 @@ async function fetchIncidents() {
 }
 
 async function loadCapacityPlan() {
-    setLoading("capacity-result");
+    setLoadingWithSpinner("capacity-result");
     try {
         const token = localStorage.getItem('neuroops_token');
         const instancesRes = await fetch(`${API}/aws/instances`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -2220,21 +2512,29 @@ async function loadCapacityPlan() {
             const instance = instancesData.instances[0];
             const res = await fetch(`${API}/scalewise/capacity/${instance.instance_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
+            
             let html = `📊 CAPACITY PLAN\n`;
-            html += `Instance: ${data.instance_id}\n`;
-            html += `\nCPU: ${data.cpu.current_avg}% avg, growth ${data.cpu.growth_rate_per_day}%/day\n`;
-            if (data.cpu.days_until_80_percent) {
-                html += `⚠️ CPU will reach 80% in ${data.cpu.days_until_80_percent} days\n`;
+            html += `Instance: ${data.instance_id || instance.instance_id}\n`;
+            
+            const cpu = data.cpu || {};
+            const memory = data.memory || {};
+            const recommendation = data.instance_need?.recommendation || data.recommendation || 'Monitor closely';
+            
+            html += `\nCPU: ${cpu.current_avg || 0}% avg, growth ${cpu.growth_rate_per_day || 0}%/day\n`;
+            if (cpu.days_until_80_percent) {
+                html += `⚠️ CPU will reach 80% in ${cpu.days_until_80_percent} days\n`;
             }
-            html += `\nMemory: ${data.memory.current}%, growth ${data.memory.growth_rate_per_day}%/day\n`;
-            if (data.memory.days_until_90_percent) {
-                html += `⚠️ Memory will reach 90% in ${data.memory.days_until_90_percent} days\n`;
+            html += `\nMemory: ${memory.current || 0}%, growth ${memory.growth_rate_per_day || 0}%/day\n`;
+            if (memory.days_until_90_percent) {
+                html += `⚠️ Memory will reach 90% in ${memory.days_until_90_percent} days\n`;
             }
-            html += `\n💡 Recommendation: ${data.instance_need.recommendation}`;
+            html += `\n💡 Recommendation: ${recommendation}`;
             setBox("capacity-result", html);
+        } else {
+            setBox("capacity-result", "No instances found");
         }
     } catch(e) {
-        setBox("capacity-result", e.message, "error");
+        setBox("capacity-result", `Error: ${e.message}`, "error");
     }
 }
 
@@ -2306,66 +2606,26 @@ function markIncidentRead(incidentId) {
     if (incident) { incident.read = true; updateNotificationBell(); }
 }
 
-function addAlert(data) { 
-    const feed = document.getElementById("alert-feed"); 
-    if (feed.querySelector(".loading")) feed.innerHTML = ""; 
-    const sev = data.severity || "normal";
-    const priority = data.priority_score || 0;
-    
-    let priorityBadge = '';
-    if (priority >= 80) priorityBadge = '<span class="tag" style="background:rgba(255,68,85,0.3); color:#ff4455; margin-right:8px;">🔥 PRIORITY 1</span>';
-    else if (priority >= 50) priorityBadge = '<span class="tag" style="background:rgba(255,170,0,0.3); color:#ffaa00; margin-right:8px;">⚠️ PRIORITY 2</span>';
-    else if (priority >= 30) priorityBadge = '<span class="tag" style="background:rgba(0,212,255,0.3); color:#00d4ff; margin-right:8px;">📌 PRIORITY 3</span>';
-    
-    const item = document.createElement("div"); 
-    item.className = `alert-item ${sev}`; 
-    item.innerHTML = `
-        <div class="alert-dot ${sev}"></div>
-        <div style="flex:1;font-size:13px">
-            ${priorityBadge}
-            ${data.message || "metric analyzed"}
-        </div>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${new Date().toLocaleTimeString()}</span>
-        <span class="tag ${sev}" style="margin-left:8px">${sev.toUpperCase()}</span>
-    `; 
-    feed.insertBefore(item, feed.firstChild); 
-    if (feed.children.length > 20) feed.removeChild(feed.lastChild); 
-}
-
-function loadAlerts() {
-    loadPrioritizedAlerts();
-}
-
-async function loadPrioritizedAlerts() {
-    try {
-        const token = localStorage.getItem('neuroops_token');
-        if (!token) return;
-        
-        const response = await fetch(`${API}/inframind/alerts/priority`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        
-        if (data.alerts && data.alerts.length) {
-            const feed = document.getElementById("alert-feed");
-            feed.innerHTML = "";
-            for (const alert of data.alerts) {
-                addAlert({
-                    severity: alert.severity,
-                    message: alert.message,
-                    priority_score: alert.priority_score
-                });
+// Backend reachability check
+function checkBackendReachable() {
+    fetch(`${API}/health`)
+        .then(response => {
+            if (!response.ok) {
+                showToast('Backend connection issue. Please refresh or contact admin.', 'warning');
             }
-        }
-    } catch(e) {
-        console.log('Failed to load prioritized alerts:', e);
-    }
+        })
+        .catch(() => {
+            showToast('⚠️ Cannot reach backend. EC2 IP may have changed. Please refresh.', 'error');
+        });
 }
 
 async function init() {
     loadTheme();
     const isAuth = await checkAuth();
     if (isAuth) {
+        anomalyChart = makeLineChart("anomalyChart", "anomaly score", "#00d4ff");
+        infChart = makeLineChart("infChart", "score", "#7c3aed");
+        
         initAutoRefresh();
         loadAlerts(); 
         connectWS();
@@ -2394,6 +2654,7 @@ async function init() {
         setInterval(loadServiceDropdowns, 60000);
         setInterval(loadServices, 60000);
         setInterval(loadPrioritizedAlerts, 30000);
+        setInterval(checkBackendReachable, 300000);
         setTimeout(autoFetchLatestPredictions, 2000);
     }
 }
@@ -2401,20 +2662,4 @@ async function init() {
 init();
 </script>
 </body>
-</html><script>
-// Add IP change detection
-function checkBackendReachable() {
-    fetch('/api/v1/health')
-        .then(response => {
-            if (!response.ok) {
-                showToast('Backend connection issue. Please refresh or contact admin.', 'warning');
-            }
-        })
-        .catch(() => {
-            showToast('⚠️ Cannot reach backend. EC2 IP may have changed. Please refresh.', 'error');
-        });
-}
-
-// Run every 5 minutes
-setInterval(checkBackendReachable, 300000);
-</script>
+</html>

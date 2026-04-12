@@ -1,14 +1,16 @@
-"""
-NeuroOps - AI-Powered Infrastructure Operations Platform
-FastAPI Application Entry Point - Clean Version
-"""
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 import os
+import signal
+from backend.middleware.request_id import RequestIDMiddleware
+import asyncio
+from datetime import datetime
 import logging
-
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from backend.core.config import settings
 from backend.core.logger import get_logger
 from backend.services.metrics_analyzer import start_metrics_analyzer
@@ -34,6 +36,9 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # ========== MIDDLEWARE ==========
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +47,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from slowapi.middleware import SlowAPIMiddleware
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(RequestIDMiddleware)
 
 # ========== GLOBAL EXCEPTION HANDLERS ==========
 @app.exception_handler(HTTPException)
@@ -121,3 +129,16 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": settings.APP_VERSION}
+
+@app.get("/ping")
+async def ping():
+    """Lightweight health check for ALB - no DB dependency"""
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Graceful shutdown - wait for in-flight requests to complete"""
+    logger.info("NeuroOps shutting down gracefully...")
+    await asyncio.sleep(3)  # Wait for in-flight requests
+    logger.info("Shutdown complete")

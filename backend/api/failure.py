@@ -144,45 +144,39 @@ def failure_countdown(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """RUL countdown using AWS metrics"""
+    """RUL countdown using REAL AWS metrics"""
     try:
+        from backend.services.rul_predictor import predict_rul
+        
+        instance_id = data.get("instance_id", "unknown")
         cpu_usage = data.get("cpu_usage", 0)
-        memory_usage = data.get("memory_usage", 0)
-        disk_usage = data.get("disk_usage", 0)
+        memory_usage = data.get("memory_usage", 70)
+        disk_usage = data.get("disk_usage", 30)
         instance_age_days = data.get("instance_age_days", 30)
-        unit_id = data.get("unit_id", "unknown")
         
-        # Simple RUL calculation based on CPU usage
-        if cpu_usage > 90:
-            cycles = 5
-            urgency = "CRITICAL"
-            recommendation = "Immediate action required!"
-        elif cpu_usage > 75:
-            cycles = 15
-            urgency = "HIGH"
-            recommendation = "Schedule maintenance soon."
-        elif cpu_usage > 60:
-            cycles = 30
-            urgency = "MEDIUM"
-            recommendation = "Plan maintenance within month."
-        else:
-            cycles = 60
-            urgency = "LOW"
-            recommendation = "System healthy, monitor normally."
+        # Call the REAL RUL predictor (5-feature ML model)
+        result = predict_rul(
+            cpu_usage=cpu_usage,
+            memory_usage=memory_usage,
+            instance_age_days=instance_age_days,
+            disk_usage=disk_usage
+        )
         
-        result = {
-            "unit_id": unit_id,
-            "cycles_remaining": cycles,
-            "hours_remaining": cycles,
-            "urgency": urgency,
-            "recommendation": recommendation,
-            "confidence_pct": 85,
-            "lower_bound": max(0, cycles - 10),
-            "upper_bound": cycles + 10,
-            "model_used": "simple_rule_based"
-        }
+        # Add instance ID to response
+        result["unit_id"] = instance_id
         
-        db.commit()
+        # Store prediction in Redis for auto-refresh
+        try:
+            from backend.services.redis_service import redis_client
+            import json
+            redis_client.setex(
+                f"rul_prediction:{instance_id}",
+                300,
+                json.dumps(result)
+            )
+        except:
+            pass
+        
         return result
         
     except Exception as e:

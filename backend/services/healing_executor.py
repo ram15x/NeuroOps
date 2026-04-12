@@ -681,22 +681,24 @@ class HealingExecutor:
             **aws_result
         }
 
-        # Store in database
+        # Store in database - FIXED: Convert details dict to JSON string
+        details_dict = {
+            "reason": action_data["reason"],
+            "metric_value": action_data["metric_value"],
+            "metric_type": action_data["metric_type"],
+            "requires_approval": action_data["requires_approval"],
+            "aws_result": aws_result,
+            "rollback_triggered": rollback_triggered,
+            "verification": verification
+        }
+        
         healing_action = HealingAction(
             service_name=action_data["service"],
             severity=action_data["severity"],
             action_taken=action_data["action"],
             status=status,
             triggered_by="auto",
-            details={
-                "reason": action_data["reason"],
-                "metric_value": action_data["metric_value"],
-                "metric_type": action_data["metric_type"],
-                "requires_approval": action_data["requires_approval"],
-                "aws_result": aws_result,
-                "rollback_triggered": rollback_triggered,
-                "verification": verification
-            },
+            details=json.dumps(details_dict),  # <-- CRITICAL FIX: Convert dict to JSON string
             created_at=datetime.utcnow(),
             completed_at=datetime.utcnow() if status in ["completed", "failed"] else None
         )
@@ -717,10 +719,10 @@ class HealingExecutor:
             action_taken="rollback",
             status="completed" if result.get("success") else "failed",
             triggered_by="manual",
-            details={
+            details=json.dumps({
                 "previous_action_id": previous_action_id,
                 "rollback_result": result
-            },
+            }),  # <-- FIXED: Convert dict to JSON string
             created_at=datetime.utcnow(),
             completed_at=datetime.utcnow()
         )
@@ -728,11 +730,3 @@ class HealingExecutor:
         self.db.commit()
 
         return result
-# Fix for JSON serialization in healing_actions
-import json
-
-def _safe_json_dumps(obj):
-    """Convert dict to JSON string safely"""
-    if isinstance(obj, dict):
-        return json.dumps(obj, default=str)
-    return obj

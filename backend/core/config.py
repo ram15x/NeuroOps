@@ -3,6 +3,14 @@ from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 load_dotenv()
 
+# In production, override with SSM Parameter Store
+import os
+if os.getenv("ENV") == "production":
+    from backend.core.ssm import load_config_from_ssm
+    ssm_config = load_config_from_ssm()
+    for key, value in ssm_config.items():
+        os.environ[key] = value
+
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "NeuroOps"
@@ -274,3 +282,32 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+
+def validate_config():
+    """Validate required configuration on startup"""
+    required = [
+        "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
+        "REDIS_HOST", "REDIS_PORT",
+        "JWT_SECRET",
+        "AWS_REGION",
+    ]
+    
+    missing = []
+    for key in required:
+        value = getattr(settings, key, None)
+        if value is None or value == "":
+            missing.append(key)
+    
+    if missing:
+        raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+    
+    # Validate JWT secret is not default
+    if settings.JWT_SECRET == "your-secret-key-change-in-prod":
+        raise ValueError("JWT_SECRET must be changed from default value!")
+    
+    return True
+
+
+# Run validation on import
+validate_config()

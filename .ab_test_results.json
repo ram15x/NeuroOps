@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-04-09T11:32:15.532855",
+  "timestamp": "2026-04-10T18:37:57.146666",
   "random_forest": {
-    "accuracy": 86.0,
+    "accuracy": 90.64,
     "model_file": "rul_real_model.pkl"
   },
   "gradient_boosting": {
-    "accuracy": 94.75,
+    "accuracy": 85.37,
     "model_file": "xgboost_production_model.pkl"
   },
-  "winner": "gradient_boosting",
-  "winner_model_file": "xgboost_production_model.pkl"
+  "winner": "random_forest",
+  "winner_model_file": "rul_real_model.pkl"
 }
